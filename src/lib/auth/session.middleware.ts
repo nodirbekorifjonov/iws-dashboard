@@ -20,8 +20,17 @@ export async function handleSession(request: NextRequest) {
     }
 
     return new NextResponse(
-      'Server configuration error: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in Vercel environment variables.',
-      { status: 503 }
+      [
+        'Supabase is not configured on Vercel.',
+        '',
+        'Add these Environment Variables (Settings → Environment Variables):',
+        '  NEXT_PUBLIC_SUPABASE_URL',
+        '  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+        '  BACKEND_PROVIDER=supabase',
+        '',
+        'Enable them for Production, Preview, and Development, then Redeploy.',
+      ].join('\n'),
+      { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } }
     );
   }
 
