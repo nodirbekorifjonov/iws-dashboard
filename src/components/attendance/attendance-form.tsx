@@ -421,76 +421,78 @@ export function AttendanceForm({
         )}
       </div>
 
-      <Modal
-        isOpen={!!editModal}
-        onClose={() => setEditModal(null)}
-        title={editModal?.mode === 'absent' ? 'Kelmaslik sababi' : 'Ishlangan soatlar'}
-      >
-        <div className="space-y-4">
-          {editModal?.mode === 'present' ? (
-            <Input
-              id="hours"
-              label="Ishlangan soatlar"
-              type="number"
-              min={0.5}
-              max={24}
-              step={0.5}
-              value={modalHours}
-              onChange={(e) => setModalHours(e.target.value)}
-            />
-          ) : (
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">
-                Kelmaslik sababi
-              </label>
-              <select
-                value={modalNotes}
-                onChange={(e) => setModalNotes(e.target.value)}
-                className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              >
-                <option value="Sababsiz kelmadi">Sababsiz kelmadi</option>
-                <option value="Kasallik">Kasallik</option>
-                <option value="Ta&apos;til">Ta&apos;til</option>
-                <option value="Shaxsiy sabab">Shaxsiy sabab</option>
-                <option value="Ruxsat bilan">Ruxsat bilan</option>
-              </select>
-            </div>
-          )}
-          <div className="flex justify-end gap-3">
-            <Button variant="secondary" onClick={() => setEditModal(null)}>
-              Bekor qilish
-            </Button>
-            {editModal?.mode === 'present' ? (
-              <>
-                <Button
-                  variant="danger"
-                  onClick={() => setEditModal({ ...editModal, mode: 'absent' })}
-                >
-                  <X className="mr-2 h-4 w-4" />
-                  Ishlamadi
-                </Button>
-                <Button onClick={handleMarkPresent}>
-                  <Check className="mr-2 h-4 w-4" />
-                  Saqlash
-                </Button>
-              </>
+      {editModal && (
+        <Modal
+          isOpen
+          onClose={() => setEditModal(null)}
+          title={editModal.mode === 'absent' ? 'Kelmaslik sababi' : 'Ishlangan soatlar'}
+        >
+          <div className="space-y-4">
+            {editModal.mode === 'present' ? (
+              <Input
+                id="hours"
+                label="Ishlangan soatlar"
+                type="number"
+                min={0.5}
+                max={24}
+                step={0.5}
+                value={modalHours}
+                onChange={(e) => setModalHours(e.target.value)}
+              />
             ) : (
-              <>
-                <Button
-                  variant="secondary"
-                  onClick={() => setEditModal({ ...editModal, mode: 'present' })}
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">
+                  Kelmaslik sababi
+                </label>
+                <select
+                  value={modalNotes}
+                  onChange={(e) => setModalNotes(e.target.value)}
+                  className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 >
-                  Orqaga
-                </Button>
-                <Button onClick={handleMarkAbsent} variant="danger">
-                  <X className="mr-2 h-4 w-4" />
-                  Saqlash
-                </Button>
-              </>
+                  <option value="Sababsiz kelmadi">Sababsiz kelmadi</option>
+                  <option value="Kasallik">Kasallik</option>
+                  <option value="Ta&apos;til">Ta&apos;til</option>
+                  <option value="Shaxsiy sabab">Shaxsiy sabab</option>
+                  <option value="Ruxsat bilan">Ruxsat bilan</option>
+                </select>
+              </div>
             )}
+            <div className="flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setEditModal(null)}>
+                Bekor qilish
+              </Button>
+              {editModal.mode === 'present' ? (
+                <>
+                  <Button
+                    variant="danger"
+                    onClick={() => setEditModal({ ...editModal, mode: 'absent' })}
+                  >
+                    <X className="mr-2 h-4 w-4" />
+                    Ishlamadi
+                  </Button>
+                  <Button onClick={handleMarkPresent}>
+                    <Check className="mr-2 h-4 w-4" />
+                    Saqlash
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setEditModal({ ...editModal, mode: 'present' })}
+                  >
+                    Orqaga
+                  </Button>
+                  <Button onClick={handleMarkAbsent} variant="danger">
+                    <X className="mr-2 h-4 w-4" />
+                    Saqlash
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      </Modal>
+        </Modal>
+      )}
     </>
   );
 }
