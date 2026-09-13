@@ -1,22 +1,23 @@
+import { getSupabaseEnv } from '@/lib/supabase-env';
 import { createServerClient } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
+    request,
   });
 
-  const supabase = createServerClient(supabaseUrl!, supabaseKey!, {
+  const env = getSupabaseEnv();
+  if (!env) {
+    return { user: null, response: supabaseResponse, configError: true as const };
+  }
+
+  const supabase = createServerClient(env.url, env.key, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet, headers) {
         cookiesToSet.forEach(({ name, value }) =>
           request.cookies.set(name, value)
         );
@@ -26,13 +27,15 @@ export async function updateSession(request: NextRequest) {
         cookiesToSet.forEach(({ name, value, options }) =>
           supabaseResponse.cookies.set(name, value, options)
         );
+        Object.entries(headers).forEach(([key, value]) =>
+          supabaseResponse.headers.set(key, value)
+        );
       },
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims ?? null;
 
-  return { supabase, user, response: supabaseResponse };
+  return { user, response: supabaseResponse, configError: false as const };
 }
