@@ -465,7 +465,9 @@ export function AttendanceForm({
                 <>
                   <Button
                     variant="danger"
-                    onClick={() => setEditModal({ ...editModal, mode: 'absent' })}
+                    onClick={() =>
+                      setEditModal((prev) => (prev ? { ...prev, mode: 'absent' } : null))
+                    }
                   >
                     <X className="mr-2 h-4 w-4" />
                     Ishlamadi
@@ -479,7 +481,9 @@ export function AttendanceForm({
                 <>
                   <Button
                     variant="secondary"
-                    onClick={() => setEditModal({ ...editModal, mode: 'present' })}
+                    onClick={() =>
+                      setEditModal((prev) => (prev ? { ...prev, mode: 'present' } : null))
+                    }
                   >
                     Orqaga
                   </Button>
