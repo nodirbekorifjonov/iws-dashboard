@@ -115,3 +115,4 @@ src/
 │   └── repositories/     # Repository interfeyslari
 └── types/                # TypeScript turlari
 ```
+# iws-dashboard
