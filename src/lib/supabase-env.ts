@@ -1,19 +1,19 @@
-function readEnv(...names: string[]) {
-  for (const name of names) {
-    const value = process.env[name]?.trim();
-    if (value) return value;
-  }
-  return undefined;
-}
-
+/**
+ * Next.js faqat statik `process.env.NEXT_PUBLIC_*` murojaatlarini build vaqtida inline qiladi.
+ * Dinamik `process.env[name]` middleware (Edge) da ishlamaydi.
+ */
 export function getSupabaseEnv() {
-  const url = readEnv('NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_URL');
-  const key = readEnv(
-    'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
-    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-    'SUPABASE_PUBLISHABLE_KEY',
-    'SUPABASE_ANON_KEY'
-  );
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ||
+    process.env.SUPABASE_URL?.trim() ||
+    '';
+
+  const key =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
+    process.env.SUPABASE_PUBLISHABLE_KEY?.trim() ||
+    process.env.SUPABASE_ANON_KEY?.trim() ||
+    '';
 
   if (!url || !key) {
     return null;
