@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { getLoginErrorMessage } from '@/lib/auth/login-errors';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -35,7 +36,7 @@ export function LoginForm({ supabaseUrl, supabaseKey }: LoginFormProps) {
       });
 
       if (signInError) {
-        setError('Email yoki parol noto\'g\'ri');
+        setError(getLoginErrorMessage(signInError));
         setLoading(false);
         return;
       }
