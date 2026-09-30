@@ -1,4 +1,4 @@
-export type UserRole = 'superadmin' | 'admin' | 'brigadier';
+export type UserRole = 'superadmin' | 'admin' | 'brigadier' | 'worker';
 
 export type AttendanceStatus =
   | 'present'
@@ -71,6 +71,8 @@ export interface Worker {
   gender: WorkerGender | null;
   shift_length: ShiftLength | null;
   hourly_rate: number;
+  login_code: string | null;
+  user_id: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -161,6 +163,7 @@ export const USER_ROLE_LABELS: Record<UserRole, string> = {
   superadmin: 'Superadmin',
   admin: 'Admin',
   brigadier: 'Brigadir',
+  worker: 'Ishchi',
 };
 
 export const WORKER_GENDER_LABELS: Record<WorkerGender, string> = {

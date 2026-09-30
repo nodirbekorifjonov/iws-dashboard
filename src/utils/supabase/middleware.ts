@@ -9,7 +9,7 @@ export async function updateSession(request: NextRequest) {
 
   const env = getSupabaseEnv();
   if (!env) {
-    return { user: null, response: supabaseResponse, configError: true as const };
+    return { user: null, role: null, response: supabaseResponse, configError: true as const };
   }
 
   const supabase = createServerClient(env.url, env.key, {
@@ -38,5 +38,15 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  return { user, response: supabaseResponse, configError: false as const };
+  let role: string | null = null;
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+    role = profile?.role ?? null;
+  }
+
+  return { user, role, response: supabaseResponse, configError: false as const };
 }

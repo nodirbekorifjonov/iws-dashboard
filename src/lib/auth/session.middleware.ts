@@ -15,12 +15,27 @@ function redirectWithSession(
   return redirectResponse;
 }
 
+const STAFF_PATH_PREFIXES = [
+  '/dashboard',
+  '/workers',
+  '/attendance',
+  '/payroll',
+  '/users',
+  '/locations',
+];
+
+function isStaffPath(pathname: string) {
+  return STAFF_PATH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
+
 /**
  * Sessiya middleware — provider-agnostic routing qoidalari.
  * Kelajakda auth provider o'zgarganda faqat session provider o'zgaradi.
  */
 export async function handleSession(request: NextRequest) {
-  const { user, response, configError } = await handleSupabaseSession(request);
+  const { user, role, response, configError } = await handleSupabaseSession(request);
 
   if (configError) {
     if (request.nextUrl.pathname === '/login') {
@@ -41,7 +56,8 @@ export async function handleSession(request: NextRequest) {
     );
   }
 
-  const isLoginPage = request.nextUrl.pathname === '/login';
+  const pathname = request.nextUrl.pathname;
+  const isLoginPage = pathname === '/login';
   const isPublicRoute = isLoginPage;
 
   if (!user && !isPublicRoute) {
@@ -49,6 +65,18 @@ export async function handleSession(request: NextRequest) {
   }
 
   if (user && isLoginPage) {
+    return redirectWithSession(
+      request,
+      response,
+      role === 'worker' ? '/my' : '/dashboard'
+    );
+  }
+
+  if (user && role === 'worker' && isStaffPath(pathname)) {
+    return redirectWithSession(request, response, '/my');
+  }
+
+  if (user && role && role !== 'worker' && (pathname === '/my' || pathname.startsWith('/my/'))) {
     return redirectWithSession(request, response, '/dashboard');
   }
 

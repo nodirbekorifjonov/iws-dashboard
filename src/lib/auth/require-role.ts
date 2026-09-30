@@ -17,13 +17,16 @@ export async function requireRole(allowed: UserRole[]) {
   return profile;
 }
 
+export const ADMIN_ROLES: UserRole[] = ['superadmin', 'admin'];
+export const STAFF_ROLES: UserRole[] = ['superadmin', 'admin', 'brigadier'];
+
 export async function requirePageRole(allowed: UserRole[]) {
   const profile = await getCurrentUser();
   if (!profile || !allowed.includes(profile.role)) {
+    if (profile?.role === 'worker') {
+      redirect('/my');
+    }
     redirect('/dashboard');
   }
   return profile;
 }
-
-export const ADMIN_ROLES: UserRole[] = ['superadmin', 'admin'];
-export const STAFF_ROLES: UserRole[] = ['superadmin', 'admin', 'brigadier'];

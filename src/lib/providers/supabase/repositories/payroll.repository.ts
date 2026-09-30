@@ -3,6 +3,7 @@ import {
   PayrollCalculationResult,
   UpdateAdvanceInput,
 } from '@/lib/repositories/types';
+import { Advance } from '@/types/database';
 import { calculatePayroll, getMonthDateRange, workersVisibleForMonth } from '@/lib/utils/payroll';
 import { createSupabaseServerClient } from '../server';
 
@@ -48,6 +49,20 @@ export class SupabasePayrollRepository implements PayrollRepository {
     );
 
     return { month: monthPrefix, rows };
+  }
+
+  async findAdvancesForWorker(workerId: string, month: string): Promise<Advance[]> {
+    const supabase = await createSupabaseServerClient();
+    const monthDate = `${month.slice(0, 7)}-01`;
+
+    const { data, error } = await supabase
+      .from('advances')
+      .select('*')
+      .eq('worker_id', workerId)
+      .eq('month', monthDate);
+
+    if (error) throw error;
+    return data || [];
   }
 
   async updateAdvance(input: UpdateAdvanceInput): Promise<void> {

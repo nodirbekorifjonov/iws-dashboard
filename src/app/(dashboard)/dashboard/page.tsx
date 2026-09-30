@@ -1,8 +1,10 @@
 import { getDashboardStats } from '@/lib/actions/attendance';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { STAFF_ROLES, requirePageRole } from '@/lib/auth/require-role';
 import { Users, CheckCircle, XCircle, Clock, Calculator } from 'lucide-react';
 
 export default async function DashboardPage() {
+  await requirePageRole(STAFF_ROLES);
   const stats = await getDashboardStats();
 
   const cards = [

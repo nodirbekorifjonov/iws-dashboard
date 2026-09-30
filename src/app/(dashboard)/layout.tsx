@@ -49,6 +49,10 @@ export default async function DashboardLayout({
     );
   }
 
+  if (profile.role === 'worker') {
+    redirect('/my');
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Sidebar userRole={profile.role} userName={profile.full_name} />

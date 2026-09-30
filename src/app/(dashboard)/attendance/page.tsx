@@ -1,11 +1,13 @@
 import { getAttendanceByMonth } from '@/lib/actions/attendance';
 import { AttendanceForm } from '@/components/attendance/attendance-form';
+import { STAFF_ROLES, requirePageRole } from '@/lib/auth/require-role';
 
 export default async function AttendancePage({
   searchParams,
 }: {
   searchParams: Promise<{ month?: string }>;
 }) {
+  await requirePageRole(STAFF_ROLES);
   const params = await searchParams;
   const now = new Date();
   const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;

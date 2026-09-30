@@ -13,8 +13,9 @@ Shirinlik zavodi uchun ishchi boshqaruv veb-dasturi.
 | Rol | Vakolatlar |
 |---|---|
 | Superadmin | Admin va brigadir hisoblarini yaratadi, tizimni to'liq boshqaradi |
-| Admin | Ish joylari, ishchilar, davomat, maosh boshqaruvi |
+| Admin | Ish joylari, ishchilar, davomat, maosh boshqaruvi; ishchi kirishini yaratadi |
 | Brigadir | O'z blokidagi ishchilarning kunlik davomatini belgilaydi |
+| Ishchi | Faqat o'z davomati, soatlari va taxminiy maoshini ko'radi |
 
 ## O'rnatish
 
@@ -35,6 +36,7 @@ npm install
    - **Profil roli himoyasi:** `005_lock_profile_roles.sql`
    - **Ishchi jinsi (soatbay default):** `006_worker_gender.sql`
    - **Ayol 8/12 soat va davomat smenasi:** `007_female_shift_hours.sql`
+   - **Ishchi portali (kod + RLS):** `008_worker_portal.sql`
    
    > ⚠️ `001` allaqachon ishga tushgan bo'lsa, qayta ishga tushirmang. Faqat kerakli tuzatish faylini ishga tushiring.
 3. `.env.local` faylini yarating:
@@ -42,7 +44,12 @@ npm install
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_project_url
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_publishable_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 ```
+
+`SUPABASE_SERVICE_ROLE_KEY` ishchi loginini yaratish va parolni yangilash uchun kerak (Supabase Dashboard → Settings → API). Brauzerga chiqmasin.
+
+Authentication → Providers → Email da public signup yoqilmasin. Ishchi hisoblari faqat admin orqali yaratiladi.
 
 ### 3. Birinchi superadmin yaratish
 
@@ -74,12 +81,21 @@ npm run dev
 
 Brauzerda [http://localhost:3000](http://localhost:3000) oching.
 
+### 5. Ishchi portali
+
+1. `008_worker_portal.sql` migratsiyasini ishga tushiring.
+2. `.env.local` ga `SUPABASE_SERVICE_ROLE_KEY` qo‘shing.
+3. Admin → Ishchilar: **Hammasiga kirish yaratish**. Har bir ishchiga `IWS-0001` kodi beriladi.
+4. Parol avtomatik: **kod + ism, bo‘sh joysiz**. Masalan `IWS-0001AkbarovaDilbar`.
+5. Ishchi `/login` da **Ishchi** tabida kod + shu parol bilan kiradi.
+
 ## MVP funksiyalar
 
 - [x] Ishchilar ro'yxati (CRUD)
 - [x] Ish joylari boshqaruvi (bloklar)
 - [x] Kunlik davomat belgilash
 - [x] Role-based autentifikatsiya
+- [x] Ishchi portali (kod + o'z davomati/maoshi)
 - [x] Responsive dizayn
 
 ## Keyingi bosqichlar

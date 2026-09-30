@@ -49,6 +49,7 @@ export async function saveAttendanceBatch(
   revalidatePath('/attendance');
   revalidatePath('/dashboard');
   revalidatePath('/payroll');
+  revalidatePath('/my');
 }
 
 export async function getAttendanceHistory(workerId: string, month: string) {

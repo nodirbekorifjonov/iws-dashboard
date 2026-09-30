@@ -23,12 +23,20 @@ import {
   roundMoney,
 } from '@/types/database';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { createWorker, updateWorker, deleteWorker } from '@/lib/actions/workers';
+import {
+  createWorker,
+  createWorkerLogin,
+  deleteWorker,
+  provisionMissingWorkerLogins,
+  resetWorkerLogin,
+  updateWorker,
+} from '@/lib/actions/workers';
 import {
   WorkerSearchFilter,
   useWorkerSearchFilter,
 } from '@/components/workers/worker-search-filter';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { workerDefaultPassword } from '@/lib/utils/worker-login';
+import { KeyRound, Pencil, Plus, Trash2, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -44,6 +52,8 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
   const [gender, setGender] = useState<WorkerGender | ''>('');
   const [shiftLength, setShiftLength] = useState<ShiftLength | ''>('');
   const [hourlyRate, setHourlyRate] = useState('');
+  const [loginLoadingId, setLoginLoadingId] = useState<string | null>(null);
+  const [bulkLoading, setBulkLoading] = useState(false);
   const {
     query,
     setQuery,
@@ -135,6 +145,68 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
     }
   }
 
+  async function handleLogin(worker: Worker) {
+    if (!worker.login_code) return;
+    const actionLabel = worker.user_id ? 'Parolni formula bo‘yicha yangilash' : 'Kirish yaratish';
+    if (!confirm(`${worker.full_name} uchun ${actionLabel.toLowerCase()}?`)) return;
+
+    setLoginLoadingId(worker.id);
+    try {
+      const result = worker.user_id
+        ? await resetWorkerLogin(worker.id)
+        : await createWorkerLogin(worker.id);
+      if (result.error) {
+        alert(result.error);
+        return;
+      }
+      const password =
+        result.password ||
+        workerDefaultPassword(worker.login_code, worker.full_name);
+      alert(
+        `Kod: ${result.loginCode || worker.login_code}\nParol: ${password}\n\nParol = kod + ism, bo‘sh joysiz.`
+      );
+      router.refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Xatolik yuz berdi');
+    } finally {
+      setLoginLoadingId(null);
+    }
+  }
+
+  async function handleProvisionAll() {
+    const missing = initialWorkers.filter((worker) => !worker.user_id && worker.login_code);
+    if (missing.length === 0) {
+      alert('Kirishi yo‘q ishchi qolmadi');
+      return;
+    }
+    if (
+      !confirm(
+        `${missing.length} ta ishchiga kirish yaratiladi. Parol = kod + ism, bo‘sh joysiz.`
+      )
+    ) {
+      return;
+    }
+
+    setBulkLoading(true);
+    try {
+      const result = await provisionMissingWorkerLogins();
+      if (result.error) {
+        alert(result.error);
+        return;
+      }
+      const failedNote =
+        result.failed && result.errors?.length
+          ? `\n\nXatolik (${result.failed}):\n${result.errors.slice(0, 8).join('\n')}`
+          : '';
+      alert(`${result.created ?? 0} ta kirish yaratildi.${failedNote}`);
+      router.refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Xatolik yuz berdi');
+    } finally {
+      setBulkLoading(false);
+    }
+  }
+
   const positionOptions = [
     { value: '', label: 'Lavozimni tanlang' },
     ...WORKER_POSITIONS.map((position) => ({
@@ -161,9 +233,21 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
 
   const showHourlyRateInput = gender === 'male' || (gender === 'female' && shiftLength === 8);
   const show12hRates = gender === 'female' && shiftLength === 12;
+  const missingLoginCodes = initialWorkers.some((worker) => !worker.login_code);
+  const missingLogins = initialWorkers.filter(
+    (worker) => !worker.user_id && worker.login_code
+  );
 
   return (
     <>
+      {missingLoginCodes ? (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Ishchi kodlari uchun Supabase SQL Editor’da{' '}
+          <code className="rounded bg-amber-100 px-1">008_worker_portal.sql</code> ni
+          ishga tushiring yoki <code className="rounded bg-amber-100 px-1">npm run migrate</code>.
+          Parol = kod + ism, bo‘sh joysiz (masalan IWS-0001AkbarovaDilbar).
+        </div>
+      ) : null}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <WorkerSearchFilter
           query={query}
@@ -179,6 +263,20 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
           <Plus className="mr-2 h-4 w-4" />
           Yangi ishchi
         </Button>
+        {missingLogins.length > 0 ? (
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleProvisionAll}
+            disabled={bulkLoading}
+            className="shrink-0"
+          >
+            <UserPlus className="mr-2 h-4 w-4" />
+            {bulkLoading
+              ? 'Yaratilmoqda...'
+              : `Hammasiga kirish yaratish (${missingLogins.length})`}
+          </Button>
+        ) : null}
       </div>
 
       <Card>
@@ -188,6 +286,7 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50">
                   <th className="px-6 py-3 text-left font-medium text-gray-600">F.I.Sh</th>
+                  <th className="px-6 py-3 text-left font-medium text-gray-600">Kod</th>
                   <th className="px-6 py-3 text-left font-medium text-gray-600">Jins</th>
                   <th className="px-6 py-3 text-left font-medium text-gray-600">Lavozim</th>
                   <th className="px-6 py-3 text-left font-medium text-gray-600">Telefon</th>
@@ -200,7 +299,7 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
               <tbody className="divide-y divide-gray-200">
                 {filteredWorkers.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
                       {initialWorkers.length === 0
                         ? 'Hozircha ishchilar yo\'q'
                         : 'Ishchi topilmadi'}
@@ -211,6 +310,9 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
                     <tr key={worker.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 font-medium text-gray-900">
                         {worker.full_name}
+                      </td>
+                      <td className="px-6 py-4 font-mono text-gray-700">
+                        {worker.login_code || '—'}
                       </td>
                       <td className="px-6 py-4 text-gray-600">
                         <div>{worker.gender ? WORKER_GENDER_LABELS[worker.gender] : '—'}</div>
@@ -256,6 +358,19 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleLogin(worker)}
+                            title={
+                              worker.user_id
+                                ? 'Parolni formula bo‘yicha yangilash'
+                                : 'Kirish yaratish'
+                            }
+                            disabled={!worker.login_code || loginLoadingId === worker.id}
+                          >
+                            <KeyRound className="h-4 w-4 text-amber-600" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"

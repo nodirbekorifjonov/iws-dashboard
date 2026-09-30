@@ -32,14 +32,46 @@ export class SupabaseWorkersRepository implements WorkersRepository {
     return data;
   }
 
-  async create(input: CreateWorkerInput): Promise<void> {
+  async findById(id: string): Promise<Worker | null> {
     const supabase = await createSupabaseServerClient();
-    const { error } = await supabase.from('workers').insert(input);
-    if (!error) return;
+    const { data, error } = await supabase
+      .from('workers')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async findByUserId(userId: string): Promise<Worker | null> {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from('workers')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async create(input: CreateWorkerInput): Promise<Worker> {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from('workers')
+      .insert(input)
+      .select('*')
+      .single();
+    if (!error && data) return data;
     if (isMissingWorkerColumn(error)) {
-      const retry = await supabase.from('workers').insert(withoutNewWorkerColumns(input));
-      if (retry.error) throw retry.error;
-      return;
+      const retry = await supabase
+        .from('workers')
+        .insert(withoutNewWorkerColumns(input))
+        .select('*')
+        .single();
+      if (retry.error || !retry.data) throw retry.error ?? new Error('Ishchi yaratilmadi');
+      return retry.data;
     }
     throw error;
   }

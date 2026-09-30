@@ -10,6 +10,14 @@ export async function getWorkers() {
   return getWorkersRepository().findAll();
 }
 
+export async function getWorkerById(id: string) {
+  return getWorkersRepository().findById(id);
+}
+
+export async function getWorkerByUserId(userId: string) {
+  return getWorkersRepository().findByUserId(userId);
+}
+
 export async function createWorker(input: CreateWorkerInput) {
   return getWorkersRepository().create(input);
 }

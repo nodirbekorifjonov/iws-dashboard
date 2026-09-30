@@ -1,16 +1,11 @@
 import { getUsers } from '@/lib/actions/auth';
-import { getCurrentUser } from '@/lib/actions/auth';
-import { redirect } from 'next/navigation';
+import { requirePageRole } from '@/lib/auth/require-role';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { USER_ROLE_LABELS } from '@/types/database';
 
 export default async function UsersPage() {
-  const currentUser = await getCurrentUser();
-
-  if (currentUser?.role !== 'superadmin') {
-    redirect('/dashboard');
-  }
+  await requirePageRole(['superadmin']);
 
   const users = await getUsers();
 
@@ -33,7 +28,8 @@ export default async function UsersPage() {
             UPDATE profiles SET role = &apos;superadmin&apos; WHERE id = &apos;...&apos;
           </code>
           . Metadata da faqat <code className="rounded bg-amber-100 px-1">full_name</code>{' '}
-          ishlatiladi.
+          ishlatiladi. Ishchi kirishi Ishchilar sahifasidan yaratiladi; parol = kod + ism
+          (bo‘sh joysiz).
         </p>
       </div>
 
@@ -69,7 +65,9 @@ export default async function UsersPage() {
                               ? 'bg-purple-100 text-purple-800'
                               : user.role === 'admin'
                                 ? 'bg-blue-100 text-blue-800'
-                                : 'bg-green-100 text-green-800'
+                                : user.role === 'worker'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-green-100 text-green-800'
                           }
                         >
                           {USER_ROLE_LABELS[user.role]}

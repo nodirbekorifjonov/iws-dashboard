@@ -85,3 +85,10 @@ export interface UpdateAdvanceInput {
   month: string;
   amount: number;
 }
+
+export interface MyMonthResult {
+  month: string;
+  worker: Worker;
+  attendance: Attendance[];
+  payroll: PayrollRow;
+}

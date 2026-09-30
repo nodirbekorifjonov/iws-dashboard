@@ -17,7 +17,7 @@ export function getLoginErrorMessage(error: AuthError): string {
     message.includes('invalid login credentials') ||
     message.includes('invalid_credentials')
   ) {
-    return 'Email yoki parol noto‘g‘ri. Supabase Authentication → Users da foydalanuvchi yaratilganini tekshiring.';
+    return 'Login yoki parol noto‘g‘ri.';
   }
 
   if (message.includes('email not confirmed')) {
