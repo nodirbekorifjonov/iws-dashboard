@@ -36,7 +36,7 @@ if (!DATABASE_URL) {
   console.error('.env.local ga qo\'shing:\n');
   console.error('  DATABASE_URL=postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres\n');
   console.error('Yoki SQL Editor\'da qo\'lda ishga tushiring:');
-  console.error('  supabase/migrations/004_hourly_salary_and_advances.sql\n');
+  console.error('  supabase/migrations/007_female_shift_hours.sql\n');
   process.exit(1);
 }
 

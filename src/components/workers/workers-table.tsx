@@ -6,9 +6,28 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { Worker, WORKER_POSITIONS } from '@/types/database';
+import {
+  Worker,
+  WorkerGender,
+  ShiftLength,
+  WORKER_POSITIONS,
+  WORKER_GENDER_LABELS,
+  SHIFT_LENGTH_LABELS,
+  FEMALE_12H_DAY_PAY,
+  FEMALE_12H_NIGHT_PAY,
+  FEMALE_12H_HOURS,
+  defaultHourlyRate,
+  female12hDayHourly,
+  female12hNightHourly,
+  isFemale12hWorker,
+  roundMoney,
+} from '@/types/database';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { createWorker, updateWorker, deleteWorker } from '@/lib/actions/workers';
+import {
+  WorkerSearchFilter,
+  useWorkerSearchFilter,
+} from '@/components/workers/worker-search-filter';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -22,15 +41,63 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
   const [showModal, setShowModal] = useState(false);
   const [editingWorker, setEditingWorker] = useState<Worker | null>(null);
   const [loading, setLoading] = useState(false);
+  const [gender, setGender] = useState<WorkerGender | ''>('');
+  const [shiftLength, setShiftLength] = useState<ShiftLength | ''>('');
+  const [hourlyRate, setHourlyRate] = useState('');
+  const {
+    query,
+    setQuery,
+    gender: filterGender,
+    setGender: setFilterGender,
+    shiftLength: filterShiftLength,
+    setShiftLength: setFilterShiftLength,
+    filteredWorkers,
+    hasActiveFilters,
+    clearFilters,
+  } = useWorkerSearchFilter(initialWorkers);
 
   function openCreate() {
     setEditingWorker(null);
+    setGender('');
+    setShiftLength('');
+    setHourlyRate('');
     setShowModal(true);
   }
 
   function openEdit(worker: Worker) {
     setEditingWorker(worker);
+    setGender(worker.gender ?? '');
+    setShiftLength(worker.shift_length ?? '');
+    setHourlyRate(worker.hourly_rate ? String(worker.hourly_rate) : '');
     setShowModal(true);
+  }
+
+  function applyRate(nextGender: WorkerGender | '', nextShift: ShiftLength | '') {
+    if (nextGender === 'male') {
+      setHourlyRate(String(defaultHourlyRate('male')));
+      return;
+    }
+    if (nextGender === 'female' && nextShift) {
+      setHourlyRate(String(defaultHourlyRate('female', nextShift)));
+    }
+  }
+
+  function handleGenderChange(value: string) {
+    const next = value === 'male' || value === 'female' ? value : '';
+    setGender(next);
+    if (next === 'male') {
+      setShiftLength('');
+      applyRate('male', '');
+      return;
+    }
+    setShiftLength('');
+    setHourlyRate('');
+  }
+
+  function handleShiftLengthChange(value: string) {
+    const next = value === '8' || value === '12' ? (Number(value) as ShiftLength) : '';
+    setShiftLength(next);
+    applyRate(gender, next);
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -40,15 +107,18 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
     const formData = new FormData(e.currentTarget);
 
     try {
-      if (editingWorker) {
-        await updateWorker(editingWorker.id, formData);
-      } else {
-        await createWorker(formData);
+      const result = editingWorker
+        ? await updateWorker(editingWorker.id, formData)
+        : await createWorker(formData);
+      if (result?.error) {
+        alert(result.error);
+        return;
       }
       setShowModal(false);
       router.refresh();
-    } catch {
-      alert('Xatolik yuz berdi');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Xatolik yuz berdi';
+      alert(message);
     } finally {
       setLoading(false);
     }
@@ -77,10 +147,35 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
       : []),
   ];
 
+  const genderOptions = [
+    { value: '', label: 'Jinsni tanlang' },
+    { value: 'male', label: WORKER_GENDER_LABELS.male },
+    { value: 'female', label: WORKER_GENDER_LABELS.female },
+  ];
+
+  const shiftLengthOptions = [
+    { value: '', label: 'Ish vaqtini tanlang' },
+    { value: '8', label: SHIFT_LENGTH_LABELS[8] },
+    { value: '12', label: SHIFT_LENGTH_LABELS[12] },
+  ];
+
+  const showHourlyRateInput = gender === 'male' || (gender === 'female' && shiftLength === 8);
+  const show12hRates = gender === 'female' && shiftLength === 12;
+
   return (
     <>
-      <div className="mb-4 flex justify-end">
-        <Button onClick={openCreate}>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <WorkerSearchFilter
+          query={query}
+          onQueryChange={setQuery}
+          gender={filterGender}
+          onGenderChange={setFilterGender}
+          shiftLength={filterShiftLength}
+          onShiftLengthChange={setFilterShiftLength}
+          hasActiveFilters={hasActiveFilters}
+          onClearFilters={clearFilters}
+        />
+        <Button onClick={openCreate} className="shrink-0">
           <Plus className="mr-2 h-4 w-4" />
           Yangi ishchi
         </Button>
@@ -93,6 +188,7 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50">
                   <th className="px-6 py-3 text-left font-medium text-gray-600">F.I.Sh</th>
+                  <th className="px-6 py-3 text-left font-medium text-gray-600">Jins</th>
                   <th className="px-6 py-3 text-left font-medium text-gray-600">Lavozim</th>
                   <th className="px-6 py-3 text-left font-medium text-gray-600">Telefon</th>
                   <th className="px-6 py-3 text-left font-medium text-gray-600">Ish boshlagan</th>
@@ -102,17 +198,27 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {initialWorkers.length === 0 ? (
+                {filteredWorkers.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-                      Hozircha ishchilar yo&apos;q
+                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                      {initialWorkers.length === 0
+                        ? 'Hozircha ishchilar yo\'q'
+                        : 'Ishchi topilmadi'}
                     </td>
                   </tr>
                 ) : (
-                  initialWorkers.map((worker) => (
+                  filteredWorkers.map((worker) => (
                     <tr key={worker.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 font-medium text-gray-900">
                         {worker.full_name}
+                      </td>
+                      <td className="px-6 py-4 text-gray-600">
+                        <div>{worker.gender ? WORKER_GENDER_LABELS[worker.gender] : '—'}</div>
+                        {worker.gender === 'female' && worker.shift_length ? (
+                          <div className="text-xs text-gray-500">
+                            {SHIFT_LENGTH_LABELS[worker.shift_length]}
+                          </div>
+                        ) : null}
                       </td>
                       <td className="px-6 py-4 text-gray-600">
                         {worker.position || '—'}
@@ -124,7 +230,18 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
                         {formatDate(worker.start_date)}
                       </td>
                       <td className="px-6 py-4 text-gray-600">
-                        {formatCurrency(worker.hourly_rate)}/soat
+                        {isFemale12hWorker(worker) ? (
+                          <div>
+                            <div>
+                              Kunduzgi: {formatCurrency(roundMoney(female12hDayHourly()))}/soat
+                            </div>
+                            <div>
+                              Kechki: {formatCurrency(roundMoney(female12hNightHourly()))}/soat
+                            </div>
+                          </div>
+                        ) : (
+                          `${formatCurrency(worker.hourly_rate)}/soat`
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <Badge
@@ -200,15 +317,69 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
             defaultValue={editingWorker?.start_date || new Date().toISOString().split('T')[0]}
             required
           />
-          <Input
-            id="hourly_rate"
-            name="hourly_rate"
-            label="Soatbay stavka (so'm/soat)"
-            type="number"
-            defaultValue={editingWorker?.hourly_rate || 0}
-            min={0}
-            step={1000}
+          <Select
+            id="gender"
+            name="gender"
+            label="Jins"
+            required
+            value={gender}
+            onChange={(e) => handleGenderChange(e.target.value)}
+            options={genderOptions}
           />
+          {gender === 'female' && (
+            <Select
+              id="shift_length"
+              name="shift_length"
+              label="Ish vaqti"
+              required
+              value={shiftLength === '' ? '' : String(shiftLength)}
+              onChange={(e) => handleShiftLengthChange(e.target.value)}
+              options={shiftLengthOptions}
+            />
+          )}
+          {showHourlyRateInput && (
+            <div>
+              <Input
+                id="hourly_rate"
+                name="hourly_rate"
+                label="Soatbay stavka (so'm/soat)"
+                type="number"
+                value={hourlyRate}
+                onChange={(e) => setHourlyRate(e.target.value)}
+                min={0}
+                step={0.01}
+                required
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                {gender === 'male'
+                  ? 'Erkak: 140 000 so\'m / 12 soat. Qiymatni qo\'lda o\'zgartirish mumkin.'
+                  : '8 soatlik: 15 000 so\'m/soat (8 soat = 120 000 so\'m). Qo\'shimcha soatlar shu stavkada.'}
+              </p>
+            </div>
+          )}
+          {show12hRates && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+              <input
+                type="hidden"
+                name="hourly_rate"
+                value={String(defaultHourlyRate('female', 12))}
+              />
+              <p className="font-medium text-gray-900">12 soatlik soatbay stavkalar</p>
+              <p className="mt-1">
+                Kunduzgi: {formatCurrency(FEMALE_12H_DAY_PAY)} / {FEMALE_12H_HOURS} soat
+                {' '}
+                ({formatCurrency(roundMoney(female12hDayHourly()))}/soat)
+              </p>
+              <p>
+                Kechki: {formatCurrency(FEMALE_12H_NIGHT_PAY)} / {FEMALE_12H_HOURS} soat
+                {' '}
+                ({formatCurrency(roundMoney(female12hNightHourly()))}/soat)
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                Stavka davomatdagi smenaga qarab avtomatik qo&apos;llaniladi.
+              </p>
+            </div>
+          )}
           {editingWorker && (
             <div className="space-y-1">
               <label className="block text-sm font-medium text-gray-700">Holat</label>

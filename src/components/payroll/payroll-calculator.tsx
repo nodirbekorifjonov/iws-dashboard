@@ -2,7 +2,13 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { PayrollRow } from '@/types/database';
+import {
+  PayrollRow,
+  female12hDayHourly,
+  female12hNightHourly,
+  isFemale12hWorker,
+  roundMoney,
+} from '@/types/database';
 import { calculatePayroll, updateAdvance } from '@/lib/actions/payroll';
 import { formatCurrency } from '@/lib/utils';
 import { exportPayrollToExcel } from '@/lib/utils/excel';
@@ -70,7 +76,11 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
   }
 
   async function handleSaveAdvance(workerId: string) {
-    const amount = parseFloat(advances[workerId]) || 0;
+    const amount = Number(advances[workerId]);
+    if (!Number.isFinite(amount) || amount < 0) {
+      alert("Avans manfiy bo'lishi mumkin emas");
+      return;
+    }
     setSavingAdvance(workerId);
     try {
       await updateAdvance(workerId, month, amount);
@@ -177,7 +187,20 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
                         )}
                       </td>
                       <td className="px-6 py-4 text-gray-600">
-                        {formatCurrency(row.worker.hourly_rate)}/soat
+                        {isFemale12hWorker(row.worker) ? (
+                          <div>
+                            <div>
+                              Kunduzgi: {formatCurrency(roundMoney(female12hDayHourly()))}
+                              /soat
+                            </div>
+                            <div>
+                              Kechki: {formatCurrency(roundMoney(female12hNightHourly()))}
+                              /soat
+                            </div>
+                          </div>
+                        ) : (
+                          `${formatCurrency(row.worker.hourly_rate)}/soat`
+                        )}
                       </td>
                       <td className="px-6 py-4 text-right font-medium text-gray-900">
                         {row.totalHours} soat

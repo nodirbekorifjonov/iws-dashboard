@@ -34,11 +34,15 @@ export class SupabaseAuthRepository implements AuthRepository {
     if (!sessionUser) return null;
 
     const supabase = await createSupabaseServerClient();
-    const { data: profile } = await supabase
+    const { data: profile, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', sessionUser.id)
-      .single();
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
 
     return profile as Profile | null;
   }

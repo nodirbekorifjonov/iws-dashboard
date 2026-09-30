@@ -1,6 +1,6 @@
 import { getAttendanceRepository, getAuthRepository } from '@/lib/providers';
 import { MarkAttendanceInput } from '@/lib/repositories/types';
-import { AttendanceStatus } from '@/types/database';
+import { AttendanceShift, AttendanceStatus } from '@/types/database';
 
 export async function getAttendanceByMonth(month: string) {
   return getAttendanceRepository().findByMonth(month);
@@ -12,6 +12,7 @@ export async function markAttendanceBatch(
     date: string;
     status: AttendanceStatus;
     hoursWorked?: number;
+    shift?: AttendanceShift | null;
     notes?: string;
   }[]
 ) {
@@ -22,6 +23,7 @@ export async function markAttendanceBatch(
     date: r.date,
     status: r.status,
     hours_worked: r.hoursWorked ?? 0,
+    shift: r.shift ?? null,
     notes: r.notes ?? null,
     marked_by: sessionUser?.id ?? null,
   }));

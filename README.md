@@ -31,8 +31,12 @@ npm install
    - **Yangi loyiha:** `001_initial_schema.sql` (faqat bir marta)
    - **User yaratish xatosi:** `002_fix_profile_trigger.sql`
    - **Ishchi qo'shish RLS xatosi:** `003_fix_rls_policies.sql`
+   - **Soatbay maosh va avans:** `004_hourly_salary_and_advances.sql`
+   - **Profil roli himoyasi:** `005_lock_profile_roles.sql`
+   - **Ishchi jinsi (soatbay default):** `006_worker_gender.sql`
+   - **Ayol 8/12 soat va davomat smenasi:** `007_female_shift_hours.sql`
    
-   > ⚠️ `001` allaqachon ishga tushgan bo'lsa, qayta ishga tushirmang. Faqat kerakli tuzatish faylini (`002` yoki `003`) ishga tushiring.
+   > ⚠️ `001` allaqachon ishga tushgan bo'lsa, qayta ishga tushirmang. Faqat kerakli tuzatish faylini ishga tushiring.
 3. `.env.local` faylini yarating:
 
 ```env
@@ -45,13 +49,22 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_publishable_key
 Supabase Dashboard → Authentication → Users → Add user:
 
 - Email va parol kiriting
-- User Metadata:
+- User Metadata (ixtiyoriy):
   ```json
   {
-    "full_name": "Super Admin",
-    "role": "superadmin"
+    "full_name": "Super Admin"
   }
   ```
+
+Yangi foydalanuvchi avtomatik `brigadier` rolida yaratiladi. Superadmin qilish uchun SQL Editor:
+
+```sql
+UPDATE public.profiles
+SET role = 'superadmin'
+WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@isko.uz' LIMIT 1);
+```
+
+Keyin `005_lock_profile_roles.sql` migratsiyasini ishga tushiring.
 
 ### 4. Ishga tushirish
 

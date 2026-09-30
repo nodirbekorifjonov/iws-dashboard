@@ -26,9 +26,14 @@ export default async function UsersPage() {
       <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 p-4">
         <p className="text-sm text-amber-800">
           Yangi foydalanuvchi yaratish uchun Supabase Dashboard → Authentication → Users
-          bo&apos;limidan foydalanuvchi qo&apos;shing va metadata da{' '}
-          <code className="rounded bg-amber-100 px-1">role</code> va{' '}
-          <code className="rounded bg-amber-100 px-1">full_name</code> ni belgilang.
+          bo&apos;limidan foydalanuvchi qo&apos;shing. Rol avtomatik{' '}
+          <code className="rounded bg-amber-100 px-1">brigadier</code> bo&apos;ladi.
+          Superadmin/admin qilish uchun SQL:{' '}
+          <code className="rounded bg-amber-100 px-1">
+            UPDATE profiles SET role = &apos;superadmin&apos; WHERE id = &apos;...&apos;
+          </code>
+          . Metadata da faqat <code className="rounded bg-amber-100 px-1">full_name</code>{' '}
+          ishlatiladi.
         </p>
       </div>
 

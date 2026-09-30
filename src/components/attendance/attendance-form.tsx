@@ -4,7 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
-import { Attendance, AttendanceStatus, Worker } from '@/types/database';
+import { Select } from '@/components/ui/select';
+import {
+  Attendance,
+  AttendanceShift,
+  AttendanceStatus,
+  ATTENDANCE_SHIFT_LABELS,
+  Worker,
+  defaultHoursForWorker,
+  isFemale12hWorker,
+} from '@/types/database';
 import { saveAttendanceBatch } from '@/lib/actions/attendance';
 import {
   getAbsenceReason,
@@ -14,6 +23,10 @@ import {
   formatMonthLabel,
 } from '@/lib/utils/payroll';
 import { exportAttendanceToExcel } from '@/lib/utils/excel';
+import {
+  WorkerSearchFilter,
+  useWorkerSearchFilter,
+} from '@/components/workers/worker-search-filter';
 import {
   ChevronLeft,
   ChevronRight,
@@ -30,6 +43,7 @@ interface CellData {
   status: AttendanceStatus;
   hoursWorked: number;
   notes: string;
+  shift: AttendanceShift | null;
 }
 
 interface AttendanceFormProps {
@@ -40,6 +54,11 @@ interface AttendanceFormProps {
 
 function cellKey(workerId: string, date: string) {
   return `${workerId}:${date}`;
+}
+
+function presentCellLabel(hoursWorked: number, shift: AttendanceShift | null, showShift: boolean) {
+  if (!showShift || !shift) return `${hoursWorked}s`;
+  return `${hoursWorked}${shift === 'night' ? 'T' : 'K'}`;
 }
 
 export function AttendanceForm({
@@ -62,6 +81,7 @@ export function AttendanceForm({
     mode: 'present' | 'absent';
   } | null>(null);
   const [modalHours, setModalHours] = useState('8');
+  const [modalShift, setModalShift] = useState<AttendanceShift | ''>('');
   const [modalNotes, setModalNotes] = useState('Sababsiz kelmadi');
 
   const buildInitialCells = useCallback(() => {
@@ -71,6 +91,7 @@ export function AttendanceForm({
         status: a.status,
         hoursWorked: a.hours_worked || 0,
         notes: a.notes || '',
+        shift: a.shift ?? null,
       };
     });
     return map;
@@ -78,10 +99,25 @@ export function AttendanceForm({
 
   const [cells, setCells] = useState<Record<string, CellData>>(buildInitialCells);
   const [exporting, setExporting] = useState(false);
+  const {
+    query,
+    setQuery,
+    gender: filterGender,
+    setGender: setFilterGender,
+    shiftLength: filterShiftLength,
+    setShiftLength: setFilterShiftLength,
+    filteredWorkers,
+    hasActiveFilters,
+    clearFilters,
+  } = useWorkerSearchFilter(workers);
 
   const daysInMonth = getDaysInMonth(month);
   const dates = getMonthDates(month);
   const monthLabel = formatMonthLabel(month);
+
+  function workerById(workerId: string) {
+    return workers.find((w) => w.id === workerId);
+  }
 
   function changeMonth(offset: number) {
     const [year, mon] = month.split('-').map(Number);
@@ -99,7 +135,14 @@ export function AttendanceForm({
 
     if (isEditing) {
       const existing = getCell(workerId, date);
-      setModalHours(existing?.hoursWorked ? String(existing.hoursWorked) : '8');
+      const worker = workerById(workerId);
+      const defaultHours = worker ? defaultHoursForWorker(worker) : 8;
+      setModalHours(
+        existing?.hoursWorked ? String(existing.hoursWorked) : String(defaultHours)
+      );
+      setModalShift(
+        existing?.shift === 'night' || existing?.shift === 'day' ? existing.shift : ''
+      );
       setModalNotes(existing?.notes || 'Sababsiz kelmadi');
       setEditModal({
         workerId,
@@ -119,10 +162,24 @@ export function AttendanceForm({
     const hours = parseFloat(modalHours) || 0;
     if (hours <= 0) return;
 
+    const worker = workerById(editModal.workerId);
+    const needsShift = worker ? isFemale12hWorker(worker) : false;
+    if (needsShift && modalShift !== 'day' && modalShift !== 'night') {
+      alert('Kunduzgi yoki kechki smenani tanlang');
+      return;
+    }
+
     const key = cellKey(editModal.workerId, editModal.date);
     setCells((prev) => ({
       ...prev,
-      [key]: { status: 'present', hoursWorked: hours, notes: '' },
+      [key]: {
+        status: 'present',
+        hoursWorked: hours,
+        notes: '',
+        shift: needsShift && (modalShift === 'day' || modalShift === 'night')
+          ? modalShift
+          : null,
+      },
     }));
     setEditModal(null);
   }
@@ -137,12 +194,29 @@ export function AttendanceForm({
         status: 'absent',
         hoursWorked: 0,
         notes: modalNotes || 'Sababsiz kelmadi',
+        shift: null,
       },
     }));
     setEditModal(null);
   }
 
   async function handleSave() {
+    const missingShift = Object.entries(cells).some(([key, data]) => {
+      if (data.status !== 'present' && data.status !== 'late') return false;
+      const workerId = key.split(':')[0];
+      const worker = workerById(workerId);
+      return (
+        !!worker &&
+        isFemale12hWorker(worker) &&
+        data.shift !== 'day' &&
+        data.shift !== 'night'
+      );
+    });
+    if (missingShift) {
+      alert('Kunduzgi yoki kechki smenani tanlang');
+      return;
+    }
+
     setSaving(true);
     try {
       const records = Object.entries(cells).map(([key, data]) => {
@@ -152,6 +226,7 @@ export function AttendanceForm({
           date,
           status: data.status,
           hoursWorked: data.hoursWorked,
+          shift: data.shift,
           notes: data.notes || undefined,
         };
       });
@@ -192,6 +267,19 @@ export function AttendanceForm({
   const selectedCellData = selectedCell
     ? getCell(selectedCell.workerId, selectedCell.date)
     : null;
+  const selectedWorker = selectedCell
+    ? workerById(selectedCell.workerId)
+    : undefined;
+  const editModalWorker = editModal ? workerById(editModal.workerId) : undefined;
+  const editNeedsShift = editModalWorker
+    ? isFemale12hWorker(editModalWorker)
+    : false;
+
+  const shiftOptions = [
+    { value: '', label: 'Smenani tanlang' },
+    { value: 'day', label: ATTENDANCE_SHIFT_LABELS.day },
+    { value: 'night', label: ATTENDANCE_SHIFT_LABELS.night },
+  ];
 
   return (
     <>
@@ -209,6 +297,16 @@ export function AttendanceForm({
               {selectedCellData.status === 'present' ? (
                 <p className="mt-1 text-sm text-amber-800">
                   Ishlangan vaqt: <strong>{selectedCellData.hoursWorked} soat</strong>
+                  {selectedWorker &&
+                  isFemale12hWorker(selectedWorker) &&
+                  selectedCellData.shift ? (
+                    <>
+                      {' · '}
+                      <strong>
+                        {ATTENDANCE_SHIFT_LABELS[selectedCellData.shift]} smena
+                      </strong>
+                    </>
+                  ) : null}
                 </p>
               ) : (
                 <p className="mt-1 text-sm text-amber-800">
@@ -228,6 +326,19 @@ export function AttendanceForm({
           </div>
         </div>
       )}
+
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <WorkerSearchFilter
+          query={query}
+          onQueryChange={setQuery}
+          gender={filterGender}
+          onGenderChange={setFilterGender}
+          shiftLength={filterShiftLength}
+          onShiftLengthChange={setFilterShiftLength}
+          hasActiveFilters={hasActiveFilters}
+          onClearFilters={clearFilters}
+        />
+      </div>
 
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
@@ -287,7 +398,7 @@ export function AttendanceForm({
                     return (
                       <th
                         key={day}
-                        className={`px-1 py-3 text-center font-medium min-w-[36px] ${
+                        className={`px-1 py-3 text-center font-medium min-w-[44px] ${
                           future
                             ? 'text-gray-300'
                             : isToday
@@ -302,20 +413,25 @@ export function AttendanceForm({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {workers.length === 0 ? (
+                {filteredWorkers.length === 0 ? (
                   <tr>
                     <td
                       colSpan={daysInMonth + 1}
                       className="px-6 py-12 text-center text-gray-500"
                     >
-                      Faol ishchilar yo&apos;q
+                      {workers.length === 0
+                        ? 'Faol ishchilar yo\'q'
+                        : 'Ishchi topilmadi'}
                     </td>
                   </tr>
                 ) : (
-                  workers.map((worker) => (
+                  filteredWorkers.map((worker) => (
                     <tr key={worker.id} className="hover:bg-gray-50">
                       <td className="sticky left-0 z-10 bg-white px-4 py-3 font-medium text-gray-900 border-r border-gray-100">
                         <div className="truncate max-w-[160px]">{worker.full_name}</div>
+                        {isFemale12hWorker(worker) && (
+                          <div className="text-xs text-indigo-600">12 soatlik</div>
+                        )}
                         {worker.position && (
                           <div className="text-xs text-gray-500 truncate">
                             {worker.position}
@@ -328,6 +444,17 @@ export function AttendanceForm({
                         const isSelected =
                           selectedCell?.workerId === worker.id &&
                           selectedCell?.date === dateStr;
+                        const isNightPresent =
+                          cell?.status === 'present' && cell.shift === 'night';
+                        const showShiftLabel = isFemale12hWorker(worker);
+                        const presentLabel =
+                          cell?.status === 'present'
+                            ? presentCellLabel(
+                                cell.hoursWorked,
+                                cell.shift,
+                                showShiftLabel
+                              )
+                            : '';
 
                         return (
                           <td
@@ -346,16 +473,22 @@ export function AttendanceForm({
                                 onClick={() =>
                                   handleCellClick(worker.id, dateStr, worker.full_name)
                                 }
-                                className={`inline-flex items-center justify-center w-7 h-7 rounded transition-colors ${
+                                className={`inline-flex items-center justify-center min-w-7 h-7 px-0.5 rounded text-[10px] font-medium transition-colors ${
                                   cell?.status === 'present'
-                                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                    ? isNightPresent
+                                      ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                                      : 'bg-green-100 text-green-700 hover:bg-green-200'
                                     : cell?.status === 'absent'
                                       ? 'bg-red-100 text-red-700 hover:bg-red-200'
                                       : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
                                 }`}
                               >
                                 {cell?.status === 'present' ? (
-                                  <Check className="h-4 w-4" />
+                                  showShiftLabel ? (
+                                    <span>{presentLabel}</span>
+                                  ) : (
+                                    <Check className="h-4 w-4" />
+                                  )
                                 ) : cell?.status === 'absent' ? (
                                   <X className="h-4 w-4" />
                                 ) : (
@@ -368,14 +501,16 @@ export function AttendanceForm({
                                 onClick={() =>
                                   handleCellClick(worker.id, dateStr, worker.full_name)
                                 }
-                                className={`inline-flex items-center justify-center w-7 h-7 rounded text-xs font-medium transition-colors hover:ring-2 hover:ring-amber-300 ${
+                                className={`inline-flex items-center justify-center min-w-7 h-7 px-0.5 rounded text-[10px] font-medium transition-colors hover:ring-2 hover:ring-amber-300 ${
                                   cell.status === 'present'
-                                    ? 'bg-green-50 text-green-700'
+                                    ? isNightPresent
+                                      ? 'bg-indigo-50 text-indigo-700'
+                                      : 'bg-green-50 text-green-700'
                                     : 'bg-red-50 text-red-600'
                                 }`}
                               >
                                 {cell.status === 'present' ? (
-                                  <span>{cell.hoursWorked}s</span>
+                                  <span>{presentLabel}</span>
                                 ) : (
                                   <X className="h-3.5 w-3.5" />
                                 )}
@@ -403,6 +538,18 @@ export function AttendanceForm({
           Ishlagan
         </span>
         <span className="flex items-center gap-1">
+          <span className="inline-flex min-w-5 h-5 items-center justify-center rounded bg-green-50 px-0.5 text-[10px] font-medium text-green-700">
+            12K
+          </span>
+          Kunduzgi smena
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-flex min-w-5 h-5 items-center justify-center rounded bg-indigo-50 px-0.5 text-[10px] font-medium text-indigo-700">
+            12T
+          </span>
+          Kechki smena
+        </span>
+        <span className="flex items-center gap-1">
           <span className="inline-flex w-5 h-5 items-center justify-center rounded bg-red-50 text-red-600">
             <X className="h-3 w-3" />
           </span>
@@ -425,20 +572,41 @@ export function AttendanceForm({
         <Modal
           isOpen
           onClose={() => setEditModal(null)}
-          title={editModal.mode === 'absent' ? 'Kelmaslik sababi' : 'Ishlangan soatlar'}
+          title={
+            editModal.mode === 'absent'
+              ? 'Kelmaslik sababi'
+              : editNeedsShift
+                ? 'Ishlangan soatlar va smena'
+                : 'Ishlangan soatlar'
+          }
         >
           <div className="space-y-4">
             {editModal.mode === 'present' ? (
-              <Input
-                id="hours"
-                label="Ishlangan soatlar"
-                type="number"
-                min={0.5}
-                max={24}
-                step={0.5}
-                value={modalHours}
-                onChange={(e) => setModalHours(e.target.value)}
-              />
+              <>
+                {editNeedsShift && (
+                  <Select
+                    id="shift"
+                    label="Smena"
+                    required
+                    value={modalShift}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setModalShift(value === 'night' || value === 'day' ? value : '');
+                    }}
+                    options={shiftOptions}
+                  />
+                )}
+                <Input
+                  id="hours"
+                  label="Ishlangan soatlar"
+                  type="number"
+                  min={0.5}
+                  max={24}
+                  step={0.5}
+                  value={modalHours}
+                  onChange={(e) => setModalHours(e.target.value)}
+                />
+              </>
             ) : (
               <div className="space-y-1">
                 <label className="block text-sm font-medium text-gray-700">

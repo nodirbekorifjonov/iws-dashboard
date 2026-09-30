@@ -1,7 +1,9 @@
 import { getWorkers } from '@/lib/actions/workers';
 import { WorkersTable } from '@/components/workers/workers-table';
+import { ADMIN_ROLES, requirePageRole } from '@/lib/auth/require-role';
 
 export default async function WorkersPage() {
+  await requirePageRole(ADMIN_ROLES);
   const workers = await getWorkers();
 
   return (

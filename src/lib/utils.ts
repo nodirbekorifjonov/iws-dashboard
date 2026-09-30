@@ -14,6 +14,11 @@ export function formatDate(date: string | Date): string {
   });
 }
 
+export function toNumber(value: unknown, fallback = 0): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('uz-UZ').format(amount) + ' so\'m';
 }

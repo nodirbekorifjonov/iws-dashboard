@@ -1,13 +1,15 @@
 'use server';
 
 import { getUsers as apiGetUsers } from '@/lib/api/users';
+import { requireRole } from '@/lib/auth/require-role';
 import {
   getCurrentUser as authGetCurrentUser,
+  getSessionUser as authGetSessionUser,
   signIn as authSignIn,
   signOut as authSignOut,
 } from '@/lib/auth/auth.service';
+import { ProfileWithLocation, SessionUser } from '@/lib/repositories/types';
 import { Profile } from '@/types/database';
-import { ProfileWithLocation } from '@/lib/repositories/types';
 
 export type { ProfileWithLocation };
 
@@ -15,7 +17,12 @@ export async function getCurrentUser(): Promise<Profile | null> {
   return authGetCurrentUser();
 }
 
+export async function getSessionUser(): Promise<SessionUser | null> {
+  return authGetSessionUser();
+}
+
 export async function getUsers(): Promise<ProfileWithLocation[]> {
+  await requireRole(['superadmin']);
   return apiGetUsers();
 }
 

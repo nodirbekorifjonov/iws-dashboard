@@ -1,10 +1,18 @@
 import { handleSupabaseSession } from '@/lib/providers/supabase/session.middleware';
 import { NextResponse, type NextRequest } from 'next/server';
 
-function copyCookies(from: NextResponse, to: NextResponse) {
-  from.cookies.getAll().forEach(({ name, value }) => {
-    to.cookies.set(name, value);
+function redirectWithSession(
+  request: NextRequest,
+  sessionResponse: NextResponse,
+  pathname: string
+) {
+  const url = request.nextUrl.clone();
+  url.pathname = pathname;
+  const redirectResponse = NextResponse.redirect(url);
+  sessionResponse.cookies.getAll().forEach((cookie) => {
+    redirectResponse.cookies.set(cookie);
   });
+  return redirectResponse;
 }
 
 /**
@@ -26,7 +34,6 @@ export async function handleSession(request: NextRequest) {
         'Add these Environment Variables (Settings → Environment Variables):',
         '  NEXT_PUBLIC_SUPABASE_URL',
         '  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
-        '  BACKEND_PROVIDER=supabase',
         '',
         'Enable them for Production, Preview, and Development, then Redeploy.',
       ].join('\n'),
@@ -38,19 +45,11 @@ export async function handleSession(request: NextRequest) {
   const isPublicRoute = isLoginPage;
 
   if (!user && !isPublicRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/login';
-    const redirectResponse = NextResponse.redirect(url);
-    copyCookies(response, redirectResponse);
-    return redirectResponse;
+    return redirectWithSession(request, response, '/login');
   }
 
   if (user && isLoginPage) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
-    const redirectResponse = NextResponse.redirect(url);
-    copyCookies(response, redirectResponse);
-    return redirectResponse;
+    return redirectWithSession(request, response, '/dashboard');
   }
 
   return response;

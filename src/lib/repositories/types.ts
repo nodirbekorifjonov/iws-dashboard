@@ -1,10 +1,13 @@
 import {
-  Attendance,
-  AttendanceStatus,
-  Profile,
-  Worker,
   Advance,
+  Attendance,
+  AttendanceShift,
+  AttendanceStatus,
   PayrollRow,
+  Profile,
+  ShiftLength,
+  Worker,
+  WorkerGender,
 } from '@/types/database';
 
 export type ProfileWithLocation = Profile & {
@@ -16,6 +19,8 @@ export interface CreateWorkerInput {
   position: string | null;
   phone: string | null;
   start_date: string;
+  gender: WorkerGender | null;
+  shift_length: ShiftLength | null;
   hourly_rate: number;
 }
 
@@ -43,6 +48,7 @@ export interface MarkAttendanceInput {
   date: string;
   status: AttendanceStatus;
   hours_worked?: number;
+  shift?: AttendanceShift | null;
   notes?: string | null;
   marked_by?: string | null;
 }

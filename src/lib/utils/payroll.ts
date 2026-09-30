@@ -1,5 +1,13 @@
-import { Attendance, Worker, Advance, PayrollRow } from '@/types/database';
-import { ABSENCE_REASON_LABELS } from '@/types/database';
+import {
+  ABSENCE_REASON_LABELS,
+  Advance,
+  Attendance,
+  hourlyRateForAttendance,
+  PayrollRow,
+  roundMoney,
+  Worker,
+} from '@/types/database';
+import { toNumber } from '@/lib/utils';
 
 export function calculatePayroll(
   workers: Worker[],
@@ -10,30 +18,51 @@ export function calculatePayroll(
   const monthPrefix = month.slice(0, 7);
 
   return workers.map((worker) => {
+    const hourlyRate = toNumber(worker.hourly_rate);
     const workerAttendance = attendance.filter(
       (a) => a.worker_id === worker.id && a.date.startsWith(monthPrefix)
     );
 
-    const totalHours = workerAttendance
-      .filter((a) => a.status === 'present' || a.status === 'late')
-      .reduce((sum, a) => sum + (a.hours_worked || 0), 0);
+    const paidRecords = workerAttendance.filter(
+      (a) => a.status === 'present' || a.status === 'late'
+    );
 
-    const calculatedSalary = totalHours * worker.hourly_rate;
+    const totalHours = paidRecords.reduce(
+      (sum, a) => sum + toNumber(a.hours_worked),
+      0
+    );
+
+    const calculatedSalary = roundMoney(
+      paidRecords.reduce(
+        (sum, a) =>
+          sum +
+          toNumber(a.hours_worked) * hourlyRateForAttendance(worker, a.shift),
+        0
+      )
+    );
 
     const advance = advances.find(
       (a) => a.worker_id === worker.id && a.month.startsWith(monthPrefix)
     );
-    const advanceAmount = advance?.amount || 0;
+    const advanceAmount = Math.max(0, toNumber(advance?.amount));
     const remainingAmount = calculatedSalary - advanceAmount;
 
     return {
-      worker,
+      worker: { ...worker, hourly_rate: hourlyRate },
       totalHours,
       calculatedSalary,
       advanceAmount,
       remainingAmount,
     };
   });
+}
+
+export function workersVisibleForMonth<T extends { id: string; is_active: boolean }>(
+  workers: T[],
+  attendanceWorkerIds: Iterable<string>
+): T[] {
+  const ids = new Set(attendanceWorkerIds);
+  return workers.filter((worker) => worker.is_active || ids.has(worker.id));
 }
 
 export function getAbsenceReason(status: string, notes: string | null): string {

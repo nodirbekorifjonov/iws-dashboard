@@ -5,7 +5,7 @@ import {
   MarkAttendanceInput,
 } from '@/lib/repositories/types';
 import { Attendance } from '@/types/database';
-import { getMonthDateRange } from '@/lib/utils/payroll';
+import { getMonthDateRange, workersVisibleForMonth } from '@/lib/utils/payroll';
 import { createSupabaseServerClient } from '../server';
 
 export class SupabaseAttendanceRepository implements AttendanceRepository {
@@ -16,7 +16,6 @@ export class SupabaseAttendanceRepository implements AttendanceRepository {
     const { data: workers, error: workersError } = await supabase
       .from('workers')
       .select('*')
-      .eq('is_active', true)
       .order('full_name');
 
     if (workersError) throw workersError;
@@ -30,7 +29,10 @@ export class SupabaseAttendanceRepository implements AttendanceRepository {
     if (attendanceError) throw attendanceError;
 
     return {
-      workers: workers || [],
+      workers: workersVisibleForMonth(
+        workers || [],
+        (attendance || []).map((row) => row.worker_id)
+      ),
       attendance: attendance || [],
     };
   }
@@ -44,6 +46,7 @@ export class SupabaseAttendanceRepository implements AttendanceRepository {
       date: input.date,
       status: input.status,
       hours_worked: input.hours_worked ?? 0,
+      shift: input.shift ?? null,
       notes: input.notes ?? null,
       marked_by: input.marked_by ?? null,
     }));
@@ -52,7 +55,22 @@ export class SupabaseAttendanceRepository implements AttendanceRepository {
       .from('attendance')
       .upsert(records, { onConflict: 'worker_id,date' });
 
-    if (error) throw error;
+    if (!error) return;
+
+    const text = `${error.code ?? ''} ${error.message ?? ''}`;
+    const missingShift =
+      error.code === 'PGRST204' ||
+      text.includes("Could not find the 'shift' column");
+    if (missingShift) {
+      const withoutShift = records.map(({ shift: _shift, ...rest }) => rest);
+      const retry = await supabase
+        .from('attendance')
+        .upsert(withoutShift, { onConflict: 'worker_id,date' });
+      if (retry.error) throw retry.error;
+      return;
+    }
+
+    throw error;
   }
 
   async findHistory(workerId: string, month: string): Promise<Attendance[]> {
@@ -75,27 +93,33 @@ export class SupabaseAttendanceRepository implements AttendanceRepository {
     const supabase = await createSupabaseServerClient();
     const today = new Date().toISOString().split('T')[0];
 
-    const { count: totalWorkers } = await supabase
+    const { count: totalWorkers, error: workersError } = await supabase
       .from('workers')
       .select('*', { count: 'exact', head: true })
       .eq('is_active', true);
 
-    const { data: todayAttendance } = await supabase
+    if (workersError) throw workersError;
+
+    const { data: todayAttendance, error: attendanceError } = await supabase
       .from('attendance')
       .select('status')
       .eq('date', today);
 
+    if (attendanceError) throw attendanceError;
+
     const present =
       todayAttendance?.filter((a) => a.status === 'present').length || 0;
-    const absent =
-      todayAttendance?.filter((a) => a.status === 'absent').length || 0;
     const late =
       todayAttendance?.filter((a) => a.status === 'late').length || 0;
+    const explicitAbsent =
+      todayAttendance?.filter((a) => a.status === 'absent').length || 0;
+    const marked = todayAttendance?.length || 0;
+    const unmarked = Math.max(0, (totalWorkers || 0) - marked);
 
     return {
       totalWorkers: totalWorkers || 0,
       todayPresent: present,
-      todayAbsent: absent,
+      todayAbsent: explicitAbsent + unmarked,
       todayLate: late,
     };
   }

@@ -3,7 +3,7 @@ import {
   PayrollCalculationResult,
   UpdateAdvanceInput,
 } from '@/lib/repositories/types';
-import { calculatePayroll, getMonthDateRange } from '@/lib/utils/payroll';
+import { calculatePayroll, getMonthDateRange, workersVisibleForMonth } from '@/lib/utils/payroll';
 import { createSupabaseServerClient } from '../server';
 
 export class SupabasePayrollRepository implements PayrollRepository {
@@ -16,7 +16,6 @@ export class SupabasePayrollRepository implements PayrollRepository {
     const { data: workers, error: workersError } = await supabase
       .from('workers')
       .select('*')
-      .eq('is_active', true)
       .order('full_name');
 
     if (workersError) throw workersError;
@@ -36,8 +35,13 @@ export class SupabasePayrollRepository implements PayrollRepository {
 
     if (advancesError) throw advancesError;
 
-    const rows = calculatePayroll(
+    const visibleWorkers = workersVisibleForMonth(
       workers || [],
+      (attendance || []).map((row) => row.worker_id)
+    );
+
+    const rows = calculatePayroll(
+      visibleWorkers,
       attendance || [],
       advances || [],
       monthPrefix
@@ -49,6 +53,10 @@ export class SupabasePayrollRepository implements PayrollRepository {
   async updateAdvance(input: UpdateAdvanceInput): Promise<void> {
     const supabase = await createSupabaseServerClient();
     const monthDate = `${input.month.slice(0, 7)}-01`;
+
+    if (!Number.isFinite(input.amount) || input.amount < 0) {
+      throw new Error("Avans manfiy bo'lishi mumkin emas");
+    }
 
     const { error } = await supabase.from('advances').upsert(
       {

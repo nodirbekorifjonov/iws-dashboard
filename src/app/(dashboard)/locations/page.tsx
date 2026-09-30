@@ -1,7 +1,9 @@
 import { getLocations } from '@/lib/actions/locations';
 import { LocationsGrid } from '@/components/locations/locations-grid';
+import { ADMIN_ROLES, requirePageRole } from '@/lib/auth/require-role';
 
 export default async function LocationsPage() {
+  await requirePageRole(ADMIN_ROLES);
   const locations = await getLocations();
 
   return (

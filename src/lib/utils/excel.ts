@@ -1,22 +1,45 @@
-import { PayrollRow, Worker } from '@/types/database';
+import {
+  PayrollRow,
+  Worker,
+  AttendanceShift,
+  female12hDayHourly,
+  female12hNightHourly,
+  isFemale12hWorker,
+  roundMoney,
+} from '@/types/database';
 import { getAbsenceReason } from '@/lib/utils/payroll';
 
 interface AttendanceCellData {
   status: string;
   hoursWorked: number;
   notes: string;
+  shift?: AttendanceShift | null;
 }
 
 function cellKey(workerId: string, date: string) {
   return `${workerId}:${date}`;
 }
 
-function formatAttendanceCell(cell: AttendanceCellData | undefined): string {
+function formatAttendanceCell(
+  cell: AttendanceCellData | undefined,
+  worker: Worker
+): string {
   if (!cell) return '';
   if (cell.status === 'present' || cell.status === 'late') {
+    if (isFemale12hWorker(worker) && cell.shift) {
+      const suffix = cell.shift === 'night' ? 'T' : 'K';
+      return `${cell.hoursWorked}${suffix}`;
+    }
     return String(cell.hoursWorked);
   }
   return getAbsenceReason(cell.status, cell.notes || null);
+}
+
+function formatPayrollRate(row: PayrollRow): string | number {
+  if (isFemale12hWorker(row.worker)) {
+    return `${roundMoney(female12hDayHourly())} / ${roundMoney(female12hNightHourly())}`;
+  }
+  return row.worker.hourly_rate;
 }
 
 export async function exportAttendanceToExcel(
@@ -35,7 +58,7 @@ export async function exportAttendanceToExcel(
       if (cell && (cell.status === 'present' || cell.status === 'late')) {
         totalHours += cell.hoursWorked || 0;
       }
-      return formatAttendanceCell(cell);
+      return formatAttendanceCell(cell, worker);
     });
 
     return [worker.full_name, worker.position || '', ...dayValues, totalHours];
@@ -70,7 +93,7 @@ export async function exportPayrollToExcel(rows: PayrollRow[], month: string) {
   const dataRows = rows.map((row) => [
     row.worker.full_name,
     row.worker.position || '',
-    row.worker.hourly_rate,
+    formatPayrollRate(row),
     row.totalHours,
     row.calculatedSalary,
     row.advanceAmount,
@@ -101,7 +124,7 @@ export async function exportPayrollToExcel(rows: PayrollRow[], month: string) {
   worksheet['!cols'] = [
     { wch: 28 },
     { wch: 22 },
-    { wch: 14 },
+    { wch: 22 },
     { wch: 14 },
     { wch: 18 },
     { wch: 14 },

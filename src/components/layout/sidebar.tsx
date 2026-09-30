@@ -14,7 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
 interface SidebarProps {
@@ -32,15 +32,16 @@ const navItems = [
 
 export function Sidebar({ userRole, userName }: SidebarProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const filteredNav = navItems.filter((item) => item.roles.includes(userRole));
 
   async function handleLogout() {
-    await signOut();
-    router.push('/login');
-    router.refresh();
+    try {
+      await signOut();
+    } finally {
+      window.location.assign('/login');
+    }
   }
 
   const navContent = (

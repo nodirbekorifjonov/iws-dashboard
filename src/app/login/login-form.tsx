@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { getLoginErrorMessage } from '@/lib/auth/login-errors';
 import { createBrowserClient } from '@supabase/ssr';
-import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
 type LoginFormProps = {
@@ -13,7 +12,6 @@ type LoginFormProps = {
 };
 
 export function LoginForm({ supabaseUrl, supabaseKey }: LoginFormProps) {
-  const router = useRouter();
   const supabase = useMemo(
     () => createBrowserClient(supabaseUrl, supabaseKey),
     [supabaseUrl, supabaseKey]
@@ -41,8 +39,7 @@ export function LoginForm({ supabaseUrl, supabaseKey }: LoginFormProps) {
         return;
       }
 
-      router.refresh();
-      router.push('/dashboard');
+      window.location.assign('/dashboard');
     } catch {
       setError('Kirish vaqtida xatolik yuz berdi. Qayta urinib ko\'ring.');
       setLoading(false);
