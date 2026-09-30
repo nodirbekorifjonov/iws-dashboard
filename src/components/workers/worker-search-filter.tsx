@@ -49,7 +49,7 @@ export function useWorkerSearchFilter(workers: Worker[]) {
     [workers, query, gender, shiftLength]
   );
 
-  const hasActiveFilters = Boolean(gender || (gender === 'female' && shiftLength));
+  const hasActiveFilters = Boolean(gender);
 
   function clearFilters() {
     setGender('');
