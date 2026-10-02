@@ -1,5 +1,6 @@
 import { getLocations } from '@/lib/actions/locations';
 import { LocationsGrid } from '@/components/locations/locations-grid';
+import { PageHeader } from '@/components/layout/page-header';
 import { ADMIN_ROLES, requirePageRole } from '@/lib/auth/require-role';
 
 export default async function LocationsPage() {
@@ -8,13 +9,10 @@ export default async function LocationsPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Ish joylari</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Zavod bloklari va ish joylarini boshqarish
-        </p>
-      </div>
-
+      <PageHeader
+        title="Ish joylari"
+        description="Zavod bloklari va ish joylarini boshqarish"
+      />
       <LocationsGrid initialLocations={locations} />
     </div>
   );

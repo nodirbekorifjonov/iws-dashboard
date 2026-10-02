@@ -1,7 +1,8 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { UserRole, USER_ROLE_LABELS } from '@/types/database';
+import { visibleRoleLabel } from '@/lib/auth/creator';
+import { UserRole } from '@/types/database';
 import { signOut } from '@/lib/actions/auth';
 import {
   LayoutDashboard,
@@ -10,30 +11,37 @@ import {
   Calculator,
   UserCog,
   LogOut,
-  Menu,
   X,
+  Shield,
+  MapPin,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
 
 interface SidebarProps {
   userRole: UserRole;
   userName: string;
+  mobileOpen: boolean;
+  onMobileOpenChange: (open: boolean) => void;
 }
 
 const navItems = [
-  { href: '/dashboard', label: 'Bosh sahifa', icon: LayoutDashboard, roles: ['superadmin', 'admin', 'brigadier'] },
-  { href: '/workers', label: 'Ishchilar', icon: Users, roles: ['superadmin', 'admin'] },
-  { href: '/attendance', label: 'Davomat', icon: ClipboardCheck, roles: ['superadmin', 'admin', 'brigadier'] },
-  { href: '/payroll', label: 'Hisoblash', icon: Calculator, roles: ['superadmin', 'admin'] },
-  { href: '/users', label: 'Foydalanuvchilar', icon: UserCog, roles: ['superadmin'] },
+  { href: '/dashboard', label: 'Bosh sahifa', icon: LayoutDashboard, roles: ['superadmin', 'admin', 'brigadier', 'creator'] },
+  { href: '/workers', label: 'Ishchilar', icon: Users, roles: ['superadmin', 'admin', 'creator'] },
+  { href: '/attendance', label: 'Davomat', icon: ClipboardCheck, roles: ['superadmin', 'admin', 'brigadier', 'creator'] },
+  { href: '/payroll', label: 'Hisoblash', icon: Calculator, roles: ['superadmin', 'admin', 'creator'] },
+  { href: '/locations', label: 'Ish joylari', icon: MapPin, roles: ['superadmin', 'admin', 'creator'] },
+  { href: '/users', label: 'Foydalanuvchilar', icon: UserCog, roles: ['superadmin', 'creator'] },
+  { href: '/control', label: 'Nazorat', icon: Shield, roles: ['creator'] },
 ];
 
-export function Sidebar({ userRole, userName }: SidebarProps) {
+export function Sidebar({
+  userRole,
+  userName,
+  mobileOpen,
+  onMobileOpenChange,
+}: SidebarProps) {
   const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = useState(false);
-
   const filteredNav = navItems.filter((item) => item.roles.includes(userRole));
 
   async function handleLogout() {
@@ -46,49 +54,49 @@ export function Sidebar({ userRole, userName }: SidebarProps) {
 
   const navContent = (
     <>
-      <div className="flex items-center gap-3 px-6 py-5 border-b border-amber-700/30">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500 font-bold text-white">
+      <div className="flex items-center gap-3 px-5 py-5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-xs font-bold text-white">
           IWS
         </div>
         <div>
-          <h1 className="text-lg font-bold text-white">IWS</h1>
-          <p className="text-xs text-amber-200">Isko Working System</p>
+          <h1 className="text-sm font-semibold text-slate-900">IWS</h1>
+          <p className="text-xs text-slate-500">Isko Working System</p>
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav className="flex-1 space-y-0.5 px-3 py-2">
         {filteredNav.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <Link
               key={item.href}
               href={item.href}
-              onClick={() => setMobileOpen(false)}
+              onClick={() => onMobileOpenChange(false)}
               className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-amber-600 text-white'
-                  : 'text-amber-100 hover:bg-amber-800 hover:text-white'
+                  ? 'bg-indigo-50 text-indigo-700'
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
               )}
             >
-              <Icon className="h-5 w-5" />
+              <Icon className="h-4 w-4" />
               {item.label}
             </Link>
           );
         })}
       </nav>
 
-      <div className="border-t border-amber-700/30 p-4">
-        <div className="mb-3 px-2">
-          <p className="text-sm font-medium text-white truncate">{userName}</p>
-          <p className="text-xs text-amber-200">{USER_ROLE_LABELS[userRole]}</p>
+      <div className="border-t border-slate-200 p-3">
+        <div className="mb-2 px-2">
+          <p className="truncate text-sm font-medium text-slate-900">{userName}</p>
+          <p className="text-xs text-slate-500">{visibleRoleLabel(userRole)}</p>
         </div>
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-amber-100 hover:bg-amber-800 hover:text-white transition-colors"
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
         >
-          <LogOut className="h-5 w-5" />
+          <LogOut className="h-4 w-4" />
           Chiqish
         </button>
       </div>
@@ -97,34 +105,17 @@ export function Sidebar({ userRole, userName }: SidebarProps) {
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-3 bg-amber-900 px-3 lg:hidden">
-        <button
-          type="button"
-          onClick={() => setMobileOpen(true)}
-          className="rounded-lg p-2 text-white hover:bg-amber-800"
-          aria-label="Menyuni ochish"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-amber-500 text-xs font-bold text-white">
-            IWS
-          </div>
-          <span className="text-sm font-semibold text-white">IWS</span>
-        </div>
-      </header>
-
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setMobileOpen(false)}
+            className="animate-fade-in absolute inset-0 bg-slate-900/40"
+            onClick={() => onMobileOpenChange(false)}
           />
-          <aside className="relative flex h-full w-72 flex-col bg-amber-900">
+          <aside className="relative flex h-full w-60 flex-col border-r border-slate-200 bg-white">
             <button
               type="button"
-              onClick={() => setMobileOpen(false)}
-              className="absolute top-4 right-4 rounded-lg p-1 text-amber-200 hover:text-white"
+              onClick={() => onMobileOpenChange(false)}
+              className="absolute top-4 right-3 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
               aria-label="Menyuni yopish"
             >
               <X className="h-5 w-5" />
@@ -134,7 +125,7 @@ export function Sidebar({ userRole, userName }: SidebarProps) {
         </div>
       )}
 
-      <aside className="hidden lg:flex lg:w-72 lg:flex-col lg:fixed lg:inset-y-0 bg-amber-900">
+      <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-60 lg:flex-col lg:border-r lg:border-slate-200 lg:bg-white">
         {navContent}
       </aside>
     </>

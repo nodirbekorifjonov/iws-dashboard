@@ -16,9 +16,9 @@ export default async function MyPage({
 
   if (!result) {
     return (
-      <div className="rounded-2xl border border-amber-200 bg-white p-8 text-center shadow-sm">
-        <h1 className="text-lg font-semibold text-gray-900">Ishchi yozuvi topilmadi</h1>
-        <p className="mt-3 text-sm text-gray-600">
+      <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">
+        <h1 className="text-lg font-semibold text-slate-900">Ishchi yozuvi topilmadi</h1>
+        <p className="mt-3 text-sm text-slate-600">
           Hisobingiz tizimga kirgan, lekin ishchi kartasiga ulanmagan. Adminga murojaat qiling.
         </p>
       </div>

@@ -1,3 +1,4 @@
+import { effectiveRole } from '@/lib/auth/creator';
 import { getSupabaseEnv } from '@/lib/supabase-env';
 import { createServerClient } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
@@ -45,7 +46,7 @@ export async function updateSession(request: NextRequest) {
       .select('role')
       .eq('id', user.id)
       .maybeSingle();
-    role = profile?.role ?? null;
+    role = effectiveRole(profile?.role ?? null, user.email);
   }
 
   return { user, role, response: supabaseResponse, configError: false as const };

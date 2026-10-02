@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "seed:admin": "node scripts/create-admin.mjs",
+    "seed:creator": "node scripts/create-creator.mjs",
     "migrate": "node scripts/migrate.mjs"
   },
   "dependencies": {

@@ -6,6 +6,7 @@ import {
   getDashboardStats as apiGetDashboardStats,
   markAttendanceBatch as apiMarkAttendanceBatch,
 } from '@/lib/api/attendance';
+import { recordAudit } from '@/lib/api/audit';
 import { STAFF_ROLES, requireRole } from '@/lib/auth/require-role';
 import { AttendanceShift, AttendanceStatus } from '@/types/database';
 import { revalidatePath } from 'next/cache';
@@ -25,9 +26,18 @@ export async function saveAttendanceBatch(
     notes?: string;
   }[]
 ) {
-  await requireRole(STAFF_ROLES);
+  const actor = await requireRole(STAFF_ROLES);
   try {
     await apiMarkAttendanceBatch(records);
+    const month = records[0]?.date?.slice(0, 7);
+    await recordAudit({
+      actor,
+      action: 'attendance.save',
+      entityType: 'attendance',
+      entityName: month,
+      summary: `${actor.full_name} davomatni ${records.length} qator tahrirladi`,
+      metadata: { count: records.length, month },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (message.includes('hours_worked')) {

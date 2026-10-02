@@ -24,10 +24,29 @@ const STAFF_PATH_PREFIXES = [
   '/locations',
 ];
 
-function isStaffPath(pathname: string) {
-  return STAFF_PATH_PREFIXES.some(
+const CREATOR_PATH_PREFIXES = ['/logins', '/control'];
+
+function matchesPrefix(pathname: string, prefixes: string[]) {
+  return prefixes.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
+}
+
+function isStaffPath(pathname: string) {
+  return matchesPrefix(pathname, STAFF_PATH_PREFIXES);
+}
+
+function isCreatorPath(pathname: string) {
+  return matchesPrefix(pathname, CREATOR_PATH_PREFIXES);
+}
+
+function isWorkerPath(pathname: string) {
+  return pathname === '/my' || pathname.startsWith('/my/');
+}
+
+function homePathForRole(role: string | null) {
+  if (role === 'worker') return '/my';
+  return '/dashboard';
 }
 
 /**
@@ -65,19 +84,19 @@ export async function handleSession(request: NextRequest) {
   }
 
   if (user && isLoginPage) {
-    return redirectWithSession(
-      request,
-      response,
-      role === 'worker' ? '/my' : '/dashboard'
-    );
+    return redirectWithSession(request, response, homePathForRole(role));
   }
 
-  if (user && role === 'worker' && isStaffPath(pathname)) {
+  if (user && role === 'worker' && (isStaffPath(pathname) || isCreatorPath(pathname))) {
     return redirectWithSession(request, response, '/my');
   }
 
-  if (user && role && role !== 'worker' && (pathname === '/my' || pathname.startsWith('/my/'))) {
+  if (user && role && role !== 'worker' && isWorkerPath(pathname)) {
     return redirectWithSession(request, response, '/dashboard');
+  }
+
+  if (user && role && role !== 'creator' && isCreatorPath(pathname)) {
+    return redirectWithSession(request, response, homePathForRole(role));
   }
 
   return response;

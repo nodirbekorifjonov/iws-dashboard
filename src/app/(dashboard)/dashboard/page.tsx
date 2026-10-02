@@ -1,7 +1,10 @@
 import { getDashboardStats } from '@/lib/actions/attendance';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { PageHeader } from '@/components/layout/page-header';
+import { StatCard } from '@/components/ui/stat-card';
 import { STAFF_ROLES, requirePageRole } from '@/lib/auth/require-role';
-import { Users, CheckCircle, XCircle, Clock, Calculator } from 'lucide-react';
+import { Users, CheckCircle, XCircle, Clock, Calculator, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
 
 export default async function DashboardPage() {
   await requirePageRole(STAFF_ROLES);
@@ -12,120 +15,123 @@ export default async function DashboardPage() {
       title: 'Faol ishchilar',
       value: stats.totalWorkers,
       icon: Users,
-      color: 'text-blue-600 bg-blue-100',
+      tone: 'blue' as const,
     },
     {
       title: 'Bugun keldi',
       value: stats.todayPresent,
       icon: CheckCircle,
-      color: 'text-green-600 bg-green-100',
+      tone: 'green' as const,
     },
     {
       title: 'Bugun kelmadi',
       value: stats.todayAbsent,
       icon: XCircle,
-      color: 'text-red-600 bg-red-100',
+      tone: 'red' as const,
     },
     {
       title: 'Kech qoldi',
       value: stats.todayLate,
       icon: Clock,
-      color: 'text-yellow-600 bg-yellow-100',
+      tone: 'amber' as const,
+    },
+  ];
+
+  const links = [
+    {
+      href: '/attendance',
+      title: 'Davomat',
+      description: 'Oylik davomat jadvali',
+      icon: CheckCircle,
+    },
+    {
+      href: '/workers',
+      title: 'Ishchilar ro‘yxati',
+      description: 'Ishchilarni boshqarish',
+      icon: Users,
+    },
+    {
+      href: '/payroll',
+      title: 'Hisoblash',
+      description: 'Oylik maosh hisob-kitobi',
+      icon: Calculator,
     },
   ];
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Bosh sahifa</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Bugungi holat — {new Date().toLocaleDateString('uz-UZ', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          })}
-        </p>
-      </div>
+      <PageHeader
+        title="Bosh sahifa"
+        description={`Bugungi holat — ${new Date().toLocaleDateString('uz-UZ', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })}`}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {cards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <Card key={card.title}>
-              <CardContent className="flex items-center gap-4 pt-6">
-                <div className={`rounded-lg p-3 ${card.color}`}>
-                  <Icon className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">{card.title}</p>
-                  <p className="text-2xl font-bold text-gray-900">{card.value}</p>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+        {cards.map((card) => (
+          <StatCard
+            key={card.title}
+            title={card.title}
+            value={card.value}
+            icon={card.icon}
+            tone={card.tone}
+          />
+        ))}
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <h2 className="text-lg font-semibold text-gray-900">Tez havolalar</h2>
+            <h2 className="text-base font-semibold text-slate-900">Tez havolalar</h2>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <a
-                href="/attendance"
-                className="flex items-center gap-3 rounded-lg border border-gray-200 p-4 hover:bg-gray-50 transition-colors"
-              >
-                <CheckCircle className="h-5 w-5 text-amber-600" />
-                <div>
-                  <p className="font-medium text-gray-900">Davomat</p>
-                  <p className="text-sm text-gray-500">Oylik davomat jadvali</p>
-                </div>
-              </a>
-              <a
-                href="/workers"
-                className="flex items-center gap-3 rounded-lg border border-gray-200 p-4 hover:bg-gray-50 transition-colors"
-              >
-                <Users className="h-5 w-5 text-amber-600" />
-                <div>
-                  <p className="font-medium text-gray-900">Ishchilar ro&apos;yxati</p>
-                  <p className="text-sm text-gray-500">Ishchilarni boshqarish</p>
-                </div>
-              </a>
-              <a
-                href="/payroll"
-                className="flex items-center gap-3 rounded-lg border border-gray-200 p-4 hover:bg-gray-50 transition-colors"
-              >
-                <Calculator className="h-5 w-5 text-amber-600" />
-                <div>
-                  <p className="font-medium text-gray-900">Hisoblash</p>
-                  <p className="text-sm text-gray-500">Oylik maosh hisob-kitobi</p>
-                </div>
-              </a>
-            </div>
+          <CardContent className="space-y-2">
+            {links.map((link) => {
+              const Icon = link.icon;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-slate-50"
+                >
+                  <div className="rounded-lg bg-indigo-50 p-2 text-indigo-600">
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-slate-900">{link.title}</p>
+                    <p className="text-sm text-slate-500">{link.description}</p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-slate-300" />
+                </Link>
+              );
+            })}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <h2 className="text-lg font-semibold text-gray-900">Tizim haqida</h2>
+            <h2 className="text-base font-semibold text-slate-900">Tizim haqida</h2>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              <strong>IWS (Isko Working System)</strong> — shirinlik zavodida ishlaydigan
-              ishchilarni boshqarish, kunlik davomatni kuzatish va oylik maoshni
-              hisoblash uchun yaratilgan veb-tizim.
+            <p className="text-sm leading-relaxed text-slate-600">
+              <strong className="font-semibold text-slate-900">IWS (Isko Working System)</strong> —
+              shirinlik zavodida ishlaydigan ishchilarni boshqarish, kunlik davomatni kuzatish
+              va oylik maoshni hisoblash uchun yaratilgan veb-tizim.
             </p>
-            <div className="mt-4 rounded-lg bg-amber-50 p-4">
-              <p className="text-sm font-medium text-amber-800">Imkoniyatlar</p>
-              <ul className="mt-2 space-y-1 text-sm text-amber-700">
-                <li>✓ Ishchilar ro&apos;yxati (soatbay stavka)</li>
-                <li>✓ Oylik davomat jadvali</li>
-                <li>✓ Oylik maosh hisob-kitobi</li>
-              </ul>
-            </div>
+            <ul className="mt-5 space-y-2 text-sm text-slate-600">
+              {[
+                'Ishchilar ro‘yxati (soatbay stavka)',
+                'Oylik davomat jadvali',
+                'Oylik maosh hisob-kitobi',
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-2">
+                  <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-indigo-500" />
+                  {item}
+                </li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
       </div>

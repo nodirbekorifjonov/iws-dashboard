@@ -1,8 +1,11 @@
-import type { AuthError } from '@supabase/supabase-js';
+type LoginErrorLike = {
+  message: string;
+  status?: number;
+};
 
-export function getLoginErrorMessage(error: AuthError): string {
-  const message = error.message.toLowerCase();
-  const status = error.status;
+export function getLoginErrorMessage(error: LoginErrorLike | string): string {
+  const message = (typeof error === 'string' ? error : error.message).toLowerCase();
+  const status = typeof error === 'string' ? undefined : error.status;
 
   if (status === 401 || message.includes('invalid api key')) {
     return [
@@ -24,5 +27,15 @@ export function getLoginErrorMessage(error: AuthError): string {
     return 'Email tasdiqlanmagan. Supabase Authentication → Providers → Email da tasdiqlashni o‘chiring yoki xatni tasdiqlang.';
   }
 
-  return error.message;
+  return typeof error === 'string' ? error : error.message;
+}
+
+export function getLoginModeError(mode: string): string {
+  if (mode === 'worker') {
+    return 'Bu login ishchi profili emas. Ishchi kodi bilan kiring.';
+  }
+  if (mode === 'staff') {
+    return 'Ishchi hisobi uchun Ishchi bo‘limini tanlang.';
+  }
+  return '';
 }

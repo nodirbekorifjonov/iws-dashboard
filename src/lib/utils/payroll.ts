@@ -84,10 +84,24 @@ export function getMonthDateRange(month: string): { startDate: string; endDate: 
   };
 }
 
+const UZ_MONTHS = [
+  'yanvar',
+  'fevral',
+  'mart',
+  'aprel',
+  'may',
+  'iyun',
+  'iyul',
+  'avgust',
+  'sentabr',
+  'oktabr',
+  'noyabr',
+  'dekabr',
+];
+
 export function formatMonthLabel(month: string): string {
   const [year, mon] = month.split('-').map(Number);
-  const date = new Date(year, mon - 1, 1);
-  return date.toLocaleDateString('uz-UZ', { year: 'numeric', month: 'long' });
+  return `${UZ_MONTHS[mon - 1] ?? month} ${year}`;
 }
 
 export function isFutureDate(dateStr: string): boolean {

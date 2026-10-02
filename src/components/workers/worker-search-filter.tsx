@@ -128,7 +128,7 @@ export function WorkerSearchFilter({
   return (
     <div className="flex min-w-0 flex-1 items-center gap-3">
       <div className="relative min-w-0 flex-1">
-        <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <Input
           id="worker-search"
           type="search"
@@ -150,14 +150,14 @@ export function WorkerSearchFilter({
           <ListFilter className="mr-2 h-4 w-4" />
           Filtr
           {hasActiveFilters ? (
-            <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-600 px-1.5 text-xs text-white">
+            <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-600 px-1.5 text-xs text-white">
               {gender === 'female' && shiftLength ? 2 : 1}
             </span>
           ) : null}
         </Button>
 
         {open && (
-          <div className="absolute right-0 z-20 mt-2 w-64 rounded-xl border border-gray-200 bg-white p-4 shadow-lg">
+          <div className="absolute right-0 z-20 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-4 shadow-lg">
             <Select
               id="filter-gender"
               label="Jins"

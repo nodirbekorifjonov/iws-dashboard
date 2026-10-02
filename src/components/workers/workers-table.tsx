@@ -54,6 +54,12 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
   const [hourlyRate, setHourlyRate] = useState('');
   const [loginLoadingId, setLoginLoadingId] = useState<string | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<
+    { kind: 'login'; worker: Worker } | { kind: 'provision' } | null
+  >(null);
+  const [feedback, setFeedback] = useState<{ title: string; message: string } | null>(
+    null
+  );
   const {
     query,
     setQuery,
@@ -145,66 +151,114 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
     }
   }
 
-  async function handleLogin(worker: Worker) {
-    if (!worker.login_code) return;
-    const actionLabel = worker.user_id ? 'Parolni formula bo‘yicha yangilash' : 'Kirish yaratish';
-    if (!confirm(`${worker.full_name} uchun ${actionLabel.toLowerCase()}?`)) return;
+  function loginActionLabel(worker: Worker) {
+    return worker.user_id ? 'Parolni yangilash' : 'Kirish yaratish';
+  }
 
+  function requestLogin(worker: Worker) {
+    if (!worker.login_code) return;
+    setConfirmDialog({ kind: 'login', worker });
+  }
+
+  function requestProvisionAll() {
+    const missing = initialWorkers.filter((worker) => !worker.user_id && worker.login_code);
+    if (missing.length === 0) {
+      setFeedback({ title: 'Kirish', message: 'Kirishi yo‘q ishchi qolmadi' });
+      return;
+    }
+    setConfirmDialog({ kind: 'provision' });
+  }
+
+  async function confirmLogin(worker: Worker) {
     setLoginLoadingId(worker.id);
     try {
       const result = worker.user_id
         ? await resetWorkerLogin(worker.id)
         : await createWorkerLogin(worker.id);
+      setConfirmDialog(null);
       if (result.error) {
-        alert(result.error);
+        setFeedback({ title: 'Xatolik', message: result.error });
         return;
       }
       const password =
         result.password ||
-        workerDefaultPassword(worker.login_code, worker.full_name);
-      alert(
-        `Kod: ${result.loginCode || worker.login_code}\nParol: ${password}\n\nParol = kod + ism, bo‘sh joysiz.`
-      );
+        workerDefaultPassword(worker.login_code || '', worker.full_name);
+      setFeedback({
+        title: worker.user_id ? 'Parol yangilandi' : 'Kirish yaratildi',
+        message: `Kod: ${result.loginCode || worker.login_code}\nParol: ${password}\n\nParol = kod + ism, bo‘sh joysiz.`,
+      });
       router.refresh();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Xatolik yuz berdi');
+      setConfirmDialog(null);
+      setFeedback({
+        title: 'Xatolik',
+        message: err instanceof Error ? err.message : 'Xatolik yuz berdi',
+      });
     } finally {
       setLoginLoadingId(null);
     }
   }
 
-  async function handleProvisionAll() {
-    const missing = initialWorkers.filter((worker) => !worker.user_id && worker.login_code);
-    if (missing.length === 0) {
-      alert('Kirishi yo‘q ishchi qolmadi');
-      return;
-    }
-    if (
-      !confirm(
-        `${missing.length} ta ishchiga kirish yaratiladi. Parol = kod + ism, bo‘sh joysiz.`
-      )
-    ) {
-      return;
-    }
-
+  async function confirmProvisionAll() {
     setBulkLoading(true);
     try {
       const result = await provisionMissingWorkerLogins();
+      setConfirmDialog(null);
       if (result.error) {
-        alert(result.error);
+        setFeedback({ title: 'Xatolik', message: result.error });
         return;
       }
       const failedNote =
         result.failed && result.errors?.length
           ? `\n\nXatolik (${result.failed}):\n${result.errors.slice(0, 8).join('\n')}`
           : '';
-      alert(`${result.created ?? 0} ta kirish yaratildi.${failedNote}`);
+      setFeedback({
+        title: 'Kirish yaratildi',
+        message: `${result.created ?? 0} ta kirish yaratildi.${failedNote}`,
+      });
       router.refresh();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Xatolik yuz berdi');
+      setConfirmDialog(null);
+      setFeedback({
+        title: 'Xatolik',
+        message: err instanceof Error ? err.message : 'Xatolik yuz berdi',
+      });
     } finally {
       setBulkLoading(false);
     }
+  }
+
+  function renderWorkerActions(worker: Worker, showLabels: boolean) {
+    return (
+      <div className={showLabels ? 'flex flex-wrap gap-2' : 'flex justify-end gap-2'}>
+        <Button
+          variant={showLabels ? 'secondary' : 'ghost'}
+          size="sm"
+          onClick={() => requestLogin(worker)}
+          title={
+            worker.user_id
+              ? 'Parolni formula bo‘yicha yangilash'
+              : 'Kirish yaratish'
+          }
+          disabled={!worker.login_code || loginLoadingId === worker.id}
+        >
+          <KeyRound className={`h-4 w-4 text-indigo-600 ${showLabels ? 'mr-2' : ''}`} />
+          {showLabels
+            ? loginLoadingId === worker.id
+              ? 'Yaratilmoqda...'
+              : loginActionLabel(worker)
+            : null}
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => openEdit(worker)}>
+          <Pencil className="h-4 w-4" />
+          {showLabels ? <span className="ml-2">Tahrirlash</span> : null}
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => handleDelete(worker.id)}>
+          <Trash2 className="h-4 w-4 text-red-500" />
+          {showLabels ? <span className="ml-2">O‘chirish</span> : null}
+        </Button>
+      </div>
+    );
   }
 
   const positionOptions = [
@@ -241,10 +295,10 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
   return (
     <>
       {missingLoginCodes ? (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
           Ishchi kodlari uchun Supabase SQL Editor’da{' '}
-          <code className="rounded bg-amber-100 px-1">008_worker_portal.sql</code> ni
-          ishga tushiring yoki <code className="rounded bg-amber-100 px-1">npm run migrate</code>.
+          <code className="rounded bg-white/70 px-1">008_worker_portal.sql</code> ni
+          ishga tushiring yoki <code className="rounded bg-white/70 px-1">npm run migrate</code>.
           Parol = kod + ism, bo‘sh joysiz (masalan IWS-0001AkbarovaDilbar).
         </div>
       ) : null}
@@ -267,7 +321,7 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
           <Button
             type="button"
             variant="secondary"
-            onClick={handleProvisionAll}
+            onClick={requestProvisionAll}
             disabled={bulkLoading}
             className="shrink-0"
           >
@@ -279,27 +333,61 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
         ) : null}
       </div>
 
-      <Card>
+      <div className="space-y-3 md:hidden">
+        {filteredWorkers.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center text-sm text-slate-500">
+              {initialWorkers.length === 0
+                ? 'Hozircha ishchilar yo\'q'
+                : 'Ishchi topilmadi'}
+            </CardContent>
+          </Card>
+        ) : (
+          filteredWorkers.map((worker) => (
+            <Card key={worker.id}>
+              <CardContent className="space-y-3 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-slate-900">{worker.full_name}</p>
+                    <p className="mt-1 font-mono text-sm text-slate-700">
+                      {worker.login_code || 'Kod yo‘q'}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {worker.position || 'Lavozim yo‘q'}
+                    </p>
+                  </div>
+                  <Badge variant={worker.is_active ? 'success' : 'neutral'}>
+                    {worker.is_active ? 'Faol' : 'Nofaol'}
+                  </Badge>
+                </div>
+                {renderWorkerActions(worker, true)}
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+
+      <Card className="hidden md:block">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="data-table">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="px-6 py-3 text-left font-medium text-gray-600">F.I.Sh</th>
-                  <th className="px-6 py-3 text-left font-medium text-gray-600">Kod</th>
-                  <th className="px-6 py-3 text-left font-medium text-gray-600">Jins</th>
-                  <th className="px-6 py-3 text-left font-medium text-gray-600">Lavozim</th>
-                  <th className="px-6 py-3 text-left font-medium text-gray-600">Telefon</th>
-                  <th className="px-6 py-3 text-left font-medium text-gray-600">Ish boshlagan</th>
-                  <th className="px-6 py-3 text-left font-medium text-gray-600">Soatbay stavka</th>
-                  <th className="px-6 py-3 text-left font-medium text-gray-600">Holat</th>
-                  <th className="px-6 py-3 text-right font-medium text-gray-600">Amallar</th>
+                <tr>
+                  <th>F.I.Sh</th>
+                  <th>Kod</th>
+                  <th>Jins</th>
+                  <th>Lavozim</th>
+                  <th>Telefon</th>
+                  <th>Ish boshlagan</th>
+                  <th>Soatbay stavka</th>
+                  <th>Holat</th>
+                  <th className="text-right">Amallar</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody>
                 {filteredWorkers.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={9} className="px-6 py-12 text-center text-slate-500">
                       {initialWorkers.length === 0
                         ? 'Hozircha ishchilar yo\'q'
                         : 'Ishchi topilmadi'}
@@ -307,31 +395,31 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
                   </tr>
                 ) : (
                   filteredWorkers.map((worker) => (
-                    <tr key={worker.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 font-medium text-gray-900">
+                    <tr key={worker.id}>
+                      <td className="font-medium text-slate-900">
                         {worker.full_name}
                       </td>
-                      <td className="px-6 py-4 font-mono text-gray-700">
+                      <td className="font-mono text-slate-700">
                         {worker.login_code || '—'}
                       </td>
-                      <td className="px-6 py-4 text-gray-600">
+                      <td className="text-slate-600">
                         <div>{worker.gender ? WORKER_GENDER_LABELS[worker.gender] : '—'}</div>
                         {worker.gender === 'female' && worker.shift_length ? (
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-slate-500">
                             {SHIFT_LENGTH_LABELS[worker.shift_length]}
                           </div>
                         ) : null}
                       </td>
-                      <td className="px-6 py-4 text-gray-600">
+                      <td className="text-slate-600">
                         {worker.position || '—'}
                       </td>
-                      <td className="px-6 py-4 text-gray-600">
+                      <td className="text-slate-600">
                         {worker.phone || '—'}
                       </td>
-                      <td className="px-6 py-4 text-gray-600">
+                      <td className="text-slate-600">
                         {formatDate(worker.start_date)}
                       </td>
-                      <td className="px-6 py-4 text-gray-600">
+                      <td className="text-slate-600">
                         {isFemale12hWorker(worker) ? (
                           <div>
                             <div>
@@ -345,47 +433,13 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
                           `${formatCurrency(worker.hourly_rate)}/soat`
                         )}
                       </td>
-                      <td className="px-6 py-4">
-                        <Badge
-                          className={
-                            worker.is_active
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }
-                        >
+                      <td>
+                        <Badge variant={worker.is_active ? 'success' : 'neutral'}>
                           {worker.is_active ? 'Faol' : 'Nofaol'}
                         </Badge>
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleLogin(worker)}
-                            title={
-                              worker.user_id
-                                ? 'Parolni formula bo‘yicha yangilash'
-                                : 'Kirish yaratish'
-                            }
-                            disabled={!worker.login_code || loginLoadingId === worker.id}
-                          >
-                            <KeyRound className="h-4 w-4 text-amber-600" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEdit(worker)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(worker.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </div>
+                      <td className="text-right">
+                        {renderWorkerActions(worker, false)}
                       </td>
                     </tr>
                   ))
@@ -395,6 +449,62 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
           </div>
         </CardContent>
       </Card>
+
+      <Modal
+        isOpen={confirmDialog !== null}
+        onClose={() => {
+          if (!loginLoadingId && !bulkLoading) setConfirmDialog(null);
+        }}
+        title={
+          confirmDialog?.kind === 'login'
+            ? loginActionLabel(confirmDialog.worker)
+            : 'Hammasiga kirish yaratish'
+        }
+      >
+        <p className="text-sm text-slate-700">
+          {confirmDialog?.kind === 'login'
+            ? `${confirmDialog.worker.full_name} uchun ${loginActionLabel(confirmDialog.worker).toLowerCase()}?`
+            : `${missingLogins.length} ta ishchiga kirish yaratiladi. Parol = kod + ism, bo‘sh joysiz.`}
+        </p>
+        <div className="mt-4 flex justify-end gap-3">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setConfirmDialog(null)}
+            disabled={Boolean(loginLoadingId) || bulkLoading}
+          >
+            Bekor qilish
+          </Button>
+          <Button
+            type="button"
+            onClick={() => {
+              if (confirmDialog?.kind === 'login') {
+                void confirmLogin(confirmDialog.worker);
+                return;
+              }
+              void confirmProvisionAll();
+            }}
+            disabled={Boolean(loginLoadingId) || bulkLoading}
+          >
+            {loginLoadingId || bulkLoading ? 'Yaratilmoqda...' : 'Tasdiqlash'}
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={feedback !== null}
+        onClose={() => setFeedback(null)}
+        title={feedback?.title || ''}
+      >
+        <p className="whitespace-pre-wrap break-words text-sm text-slate-700">
+          {feedback?.message}
+        </p>
+        <div className="mt-4 flex justify-end">
+          <Button type="button" onClick={() => setFeedback(null)}>
+            Yopish
+          </Button>
+        </div>
+      </Modal>
 
       <Modal
         isOpen={showModal}
@@ -465,7 +575,7 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
                 step={0.01}
                 required
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-slate-500">
                 {gender === 'male'
                   ? 'Erkak: 140 000 so\'m / 12 soat. Qiymatni qo\'lda o\'zgartirish mumkin.'
                   : '8 soatlik: 15 000 so\'m/soat (8 soat = 120 000 so\'m). Qo\'shimcha soatlar shu stavkada.'}
@@ -473,13 +583,13 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
             </div>
           )}
           {show12hRates && (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
               <input
                 type="hidden"
                 name="hourly_rate"
                 value={String(defaultHourlyRate('female', 12))}
               />
-              <p className="font-medium text-gray-900">12 soatlik soatbay stavkalar</p>
+              <p className="font-medium text-slate-900">12 soatlik soatbay stavkalar</p>
               <p className="mt-1">
                 Kunduzgi: {formatCurrency(FEMALE_12H_DAY_PAY)} / {FEMALE_12H_HOURS} soat
                 {' '}
@@ -490,18 +600,18 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
                 {' '}
                 ({formatCurrency(roundMoney(female12hNightHourly()))}/soat)
               </p>
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-slate-500">
                 Stavka davomatdagi smenaga qarab avtomatik qo&apos;llaniladi.
               </p>
             </div>
           )}
           {editingWorker && (
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">Holat</label>
+              <label className="block text-sm font-medium text-slate-700">Holat</label>
               <select
                 name="is_active"
                 defaultValue={editingWorker.is_active ? 'true' : 'false'}
-                className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
               >
                 <option value="true">Faol</option>
                 <option value="false">Nofaol</option>

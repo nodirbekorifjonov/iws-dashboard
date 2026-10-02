@@ -1,4 +1,4 @@
-export type UserRole = 'superadmin' | 'admin' | 'brigadier' | 'worker';
+export type UserRole = 'superadmin' | 'admin' | 'brigadier' | 'worker' | 'creator';
 
 export type AttendanceStatus =
   | 'present'
@@ -49,6 +49,7 @@ export interface Profile {
   full_name: string;
   role: UserRole;
   assigned_location_id: string | null;
+  access_disabled?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -74,8 +75,50 @@ export interface Worker {
   login_code: string | null;
   user_id: string | null;
   is_active: boolean;
+  login_enabled?: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface AuditEvent {
+  id: string;
+  actor_id: string | null;
+  actor_name: string;
+  actor_role: string | null;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  entity_name: string | null;
+  summary: string;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface ActivityPing {
+  user_id: string;
+  full_name: string;
+  role: string | null;
+  last_seen_at: string;
+}
+
+export interface ControlAlert {
+  id: string;
+  title: string;
+  detail: string;
+  createdAt: string;
+  severity: 'warning' | 'danger';
+}
+
+export interface ControlLoginRow {
+  id: string;
+  fullName: string;
+  role: string;
+  loginCode: string | null;
+  lastLoggedInAt: string | null;
+  isOnline: boolean;
+  hasLoggedIn: boolean;
+  loginEnabled: boolean;
+  kind: 'worker' | 'staff';
 }
 
 export function isFemale12hWorker(
@@ -159,11 +202,31 @@ export const ATTENDANCE_STATUS_COLORS: Record<AttendanceStatus, string> = {
   sick_leave: 'bg-purple-100 text-purple-800',
 };
 
+export interface ProfileLogin {
+  id: string;
+  user_id: string | null;
+  worker_id: string | null;
+  full_name: string;
+  login_code: string | null;
+  role: string;
+  logged_in_at: string;
+}
+
+export interface WorkerLoginStatus {
+  workerId: string;
+  fullName: string;
+  loginCode: string | null;
+  lastLoggedInAt: string | null;
+  loginCount: number;
+  hasLoggedIn: boolean;
+}
+
 export const USER_ROLE_LABELS: Record<UserRole, string> = {
   superadmin: 'Superadmin',
   admin: 'Admin',
   brigadier: 'Brigadir',
   worker: 'Ishchi',
+  creator: 'Creator',
 };
 
 export const WORKER_GENDER_LABELS: Record<WorkerGender, string> = {

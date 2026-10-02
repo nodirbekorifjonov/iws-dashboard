@@ -1,10 +1,8 @@
 import { getCurrentUser } from '@/lib/actions/auth';
+import { homePathForRole } from '@/lib/auth/require-role';
 import { redirect } from 'next/navigation';
 
 export default async function Home() {
   const profile = await getCurrentUser();
-  if (profile?.role === 'worker') {
-    redirect('/my');
-  }
-  redirect('/dashboard');
+  redirect(homePathForRole(profile?.role));
 }

@@ -78,7 +78,7 @@ export function LocationsGrid({ initialLocations }: LocationsGridProps) {
 
       {initialLocations.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center text-gray-500">
+          <CardContent className="py-12 text-center text-slate-500">
             Hozircha ish joylari yo&apos;q
           </CardContent>
         </Card>
@@ -89,23 +89,17 @@ export function LocationsGrid({ initialLocations }: LocationsGridProps) {
               <CardContent className="pt-6">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="rounded-lg bg-amber-100 p-2">
-                      <MapPin className="h-5 w-5 text-amber-600" />
+                    <div className="rounded-lg bg-indigo-50 p-2">
+                      <MapPin className="h-5 w-5 text-indigo-600" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900">{location.name}</h3>
+                      <h3 className="font-semibold text-slate-900">{location.name}</h3>
                       {location.description && (
-                        <p className="mt-1 text-sm text-gray-500">{location.description}</p>
+                        <p className="mt-1 text-sm text-slate-500">{location.description}</p>
                       )}
                     </div>
                   </div>
-                  <Badge
-                    className={
-                      location.is_active
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }
-                  >
+                  <Badge variant={location.is_active ? 'success' : 'neutral'}>
                     {location.is_active ? 'Faol' : 'Nofaol'}
                   </Badge>
                 </div>
@@ -138,7 +132,7 @@ export function LocationsGrid({ initialLocations }: LocationsGridProps) {
             required
           />
           <div className="space-y-1">
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="description" className="block text-sm font-medium text-slate-700">
               Tavsif
             </label>
             <textarea
@@ -146,17 +140,17 @@ export function LocationsGrid({ initialLocations }: LocationsGridProps) {
               name="description"
               rows={3}
               defaultValue={editingLocation?.description || ''}
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               placeholder="Ish joyi haqida qisqacha ma'lumot"
             />
           </div>
           {editingLocation && (
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">Holat</label>
+              <label className="block text-sm font-medium text-slate-700">Holat</label>
               <select
                 name="is_active"
                 defaultValue={editingLocation.is_active ? 'true' : 'false'}
-                className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
               >
                 <option value="true">Faol</option>
                 <option value="false">Nofaol</option>

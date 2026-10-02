@@ -1,5 +1,6 @@
 import { PayrollCalculator } from '@/components/payroll/payroll-calculator';
 import { calculatePayroll } from '@/lib/actions/payroll';
+import { PageHeader } from '@/components/layout/page-header';
 import { ADMIN_ROLES, requirePageRole } from '@/lib/auth/require-role';
 
 export default async function PayrollPage({
@@ -16,13 +17,10 @@ export default async function PayrollPage({
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Hisoblash</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Oylik maosh hisob-kitobi — davomat va avanslar asosida
-        </p>
-      </div>
-
+      <PageHeader
+        title="Hisoblash"
+        description="Oylik maosh hisob-kitobi — davomat va avanslar asosida"
+      />
       <PayrollCalculator key={month} month={month} initialRows={result.rows} />
     </div>
   );

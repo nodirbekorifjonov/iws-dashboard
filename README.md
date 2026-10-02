@@ -37,6 +37,7 @@ npm install
    - **Ishchi jinsi (soatbay default):** `006_worker_gender.sql`
    - **Ayol 8/12 soat va davomat smenasi:** `007_female_shift_hours.sql`
    - **Ishchi portali (kod + RLS):** `008_worker_portal.sql`
+   - **Profil kirishlari:** `010_profile_logins.sql`
    
    > ⚠️ `001` allaqachon ishga tushgan bo'lsa, qayta ishga tushirmang. Faqat kerakli tuzatish faylini ishga tushiring.
 3. `.env.local` faylini yarating:

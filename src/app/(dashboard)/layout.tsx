@@ -1,5 +1,6 @@
-import { Sidebar } from '@/components/layout/sidebar';
+import { AppShell } from '@/components/layout/app-shell';
 import { getCurrentUser, getSessionUser, signOut } from '@/lib/actions/auth';
+import { getLoginBlockReason } from '@/lib/api/access';
 import { redirect } from 'next/navigation';
 
 export default async function DashboardLayout({
@@ -21,10 +22,10 @@ export default async function DashboardLayout({
     }
 
     return (
-      <div className="flex min-h-screen items-center justify-center bg-amber-50 px-4">
-        <div className="max-w-md rounded-2xl border border-amber-200 bg-white p-8 text-center shadow-lg">
-          <h1 className="text-lg font-semibold text-gray-900">Profil topilmadi</h1>
-          <p className="mt-3 text-sm text-gray-600">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+        <div className="max-w-md rounded-xl border border-slate-200 bg-white p-8 text-center">
+          <h1 className="text-lg font-semibold text-slate-900">Profil topilmadi</h1>
+          <p className="mt-3 text-sm text-slate-600">
             Hisobingiz autentifikatsiyadan o‘tgan, lekin <code>profiles</code> jadvalida
             yozuv yo‘q. Superadmin migratsiyalarni tekshirsin yoki foydalanuvchini qayta
             yaratsin.
@@ -39,7 +40,7 @@ export default async function DashboardLayout({
           >
             <button
               type="submit"
-              className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
             >
               Chiqish
             </button>
@@ -53,14 +54,16 @@ export default async function DashboardLayout({
     redirect('/my');
   }
 
+  const session = await getSessionUser();
+  const blocked = await getLoginBlockReason(profile, session?.email);
+  if (blocked) {
+    await signOut();
+    redirect('/login');
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Sidebar userRole={profile.role} userName={profile.full_name} />
-      <main className="pt-14 lg:pt-0 lg:pl-72">
-        <div className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          {children}
-        </div>
-      </main>
-    </div>
+    <AppShell userRole={profile.role} userName={profile.full_name}>
+      {children}
+    </AppShell>
   );
 }

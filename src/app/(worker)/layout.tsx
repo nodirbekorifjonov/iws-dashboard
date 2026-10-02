@@ -1,4 +1,6 @@
-import { signOut } from '@/lib/actions/auth';
+import { ActivityHeartbeat } from '@/components/layout/activity-heartbeat';
+import { getSessionUser, signOut } from '@/lib/actions/auth';
+import { getLoginBlockReason } from '@/lib/api/access';
 import { requirePageRole } from '@/lib/auth/require-role';
 import { USER_ROLE_LABELS } from '@/types/database';
 import { LogOut } from 'lucide-react';
@@ -10,18 +12,25 @@ export default async function WorkerLayout({
   children: React.ReactNode;
 }) {
   const profile = await requirePageRole(['worker']);
+  const session = await getSessionUser();
+  const blocked = await getLoginBlockReason(profile, session?.email);
+  if (blocked) {
+    await signOut();
+    redirect('/login');
+  }
 
   return (
-    <div className="min-h-screen bg-amber-50">
-      <header className="sticky top-0 z-30 border-b border-amber-800/40 bg-amber-900">
+    <div className="min-h-screen bg-slate-50">
+      <ActivityHeartbeat />
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-sm font-bold text-white">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-xs font-bold text-white">
               IWS
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-white">{profile.full_name}</p>
-              <p className="text-xs text-amber-200">{USER_ROLE_LABELS.worker}</p>
+              <p className="truncate text-sm font-semibold text-slate-900">{profile.full_name}</p>
+              <p className="text-xs text-slate-500">{USER_ROLE_LABELS.worker}</p>
             </div>
           </div>
           <form
@@ -33,7 +42,7 @@ export default async function WorkerLayout({
           >
             <button
               type="submit"
-              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-amber-100 hover:bg-amber-800 hover:text-white"
+              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
             >
               <LogOut className="h-4 w-4" />
               Chiqish

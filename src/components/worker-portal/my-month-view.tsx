@@ -53,34 +53,34 @@ export function MyMonthView({ month, worker, attendance, payroll }: MyMonthViewP
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Mening davomatim</h1>
-        <p className="mt-1 text-sm text-gray-600">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Mening davomatim</h1>
+        <p className="mt-1 text-sm text-slate-500">
           {worker.full_name}
           {worker.login_code ? (
             <>
               {' · '}
-              <span className="font-mono font-medium text-gray-800">{worker.login_code}</span>
+              <span className="font-mono font-medium text-slate-800">{worker.login_code}</span>
             </>
           ) : null}
         </p>
       </div>
 
-      <div className="mb-6 flex items-center justify-between rounded-xl border border-gray-200 bg-white px-3 py-2 shadow-sm">
+      <div className="mb-6 flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2">
         <button
           type="button"
           onClick={() => changeMonth(-1)}
-          className="rounded-lg p-2 text-gray-600 hover:bg-gray-100"
+          className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
           aria-label="Oldingi oy"
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <p className="text-sm font-semibold capitalize text-gray-900">
+        <p className="text-sm font-semibold capitalize text-slate-900">
           {formatMonthLabel(month)}
         </p>
         <button
           type="button"
           onClick={() => changeMonth(1)}
-          className="rounded-lg p-2 text-gray-600 hover:bg-gray-100"
+          className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
           aria-label="Keyingi oy"
         >
           <ChevronRight className="h-5 w-5" />
@@ -92,31 +92,31 @@ export function MyMonthView({ month, worker, attendance, payroll }: MyMonthViewP
           icon={CalendarDays}
           label="Ishlagan kunlar"
           value={String(workedDays)}
-          color="text-green-700 bg-green-100"
+          color="text-emerald-600 bg-emerald-50"
         />
         <SummaryCard
           icon={Clock}
           label="Jami soat"
           value={String(payroll.totalHours)}
-          color="text-blue-700 bg-blue-100"
+          color="text-sky-600 bg-sky-50"
         />
         <SummaryCard
           icon={Wallet}
           label="Hisoblangan maosh"
           value={formatCurrency(payroll.calculatedSalary)}
-          color="text-amber-700 bg-amber-100"
+          color="text-indigo-600 bg-indigo-50"
         />
         <SummaryCard
           icon={Wallet}
           label="Avans / qoldiq"
           value={`${formatCurrency(payroll.advanceAmount)} / ${formatCurrency(payroll.remainingAmount)}`}
-          color="text-gray-700 bg-gray-100"
+          color="text-slate-600 bg-slate-100"
         />
       </div>
 
       <Card>
         <CardContent className="pt-5">
-          <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-gray-500">
+          <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-slate-500">
             {WEEKDAYS.map((day) => (
               <div key={day} className="py-1">
                 {day}
@@ -166,8 +166,8 @@ function SummaryCard({
           <Icon className="h-5 w-5" />
         </div>
         <div className="min-w-0">
-          <p className="text-xs text-gray-600">{label}</p>
-          <p className="truncate text-lg font-bold text-gray-900">{value}</p>
+          <p className="text-xs text-slate-500">{label}</p>
+          <p className="truncate text-lg font-semibold text-slate-900">{value}</p>
         </div>
       </CardContent>
     </Card>
@@ -190,9 +190,9 @@ function DayCell({
   let detail = '';
 
   if (future) {
-    classes += ' border-gray-100 bg-gray-50 text-gray-300';
+    classes += ' border-slate-100 bg-slate-50 text-slate-300';
   } else if (!record) {
-    classes += ' border-gray-200 bg-white text-gray-400';
+    classes += ' border-slate-200 bg-white text-slate-400';
     statusLabel = '—';
   } else if (record.status === 'present' || record.status === 'late') {
     classes +=

@@ -284,10 +284,10 @@ export function AttendanceForm({
   return (
     <>
       {selectedCell && selectedCellData && !isEditing && (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+        <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50 p-4">
           <div className="flex items-start justify-between">
             <div>
-              <p className="font-semibold text-amber-900">
+              <p className="font-semibold text-indigo-950">
                 {selectedCell.workerName} —{' '}
                 {new Date(selectedCell.date + 'T00:00:00').toLocaleDateString('uz-UZ', {
                   day: 'numeric',
@@ -295,7 +295,7 @@ export function AttendanceForm({
                 })}
               </p>
               {selectedCellData.status === 'present' ? (
-                <p className="mt-1 text-sm text-amber-800">
+                <p className="mt-1 text-sm text-indigo-800">
                   Ishlangan vaqt: <strong>{selectedCellData.hoursWorked} soat</strong>
                   {selectedWorker &&
                   isFemale12hWorker(selectedWorker) &&
@@ -309,7 +309,7 @@ export function AttendanceForm({
                   ) : null}
                 </p>
               ) : (
-                <p className="mt-1 text-sm text-amber-800">
+                <p className="mt-1 text-sm text-indigo-800">
                   Sabab:{' '}
                   <strong>
                     {getAbsenceReason(selectedCellData.status, selectedCellData.notes)}
@@ -319,7 +319,7 @@ export function AttendanceForm({
             </div>
             <button
               onClick={() => setSelectedCell(null)}
-              className="text-amber-600 hover:text-amber-800"
+              className="text-indigo-600 hover:text-indigo-800"
             >
               <X className="h-4 w-4" />
             </button>
@@ -345,7 +345,7 @@ export function AttendanceForm({
           <Button variant="secondary" size="sm" onClick={() => changeMonth(-1)}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="text-sm font-medium text-gray-900 min-w-[140px] text-center">
+          <span className="min-w-[140px] text-center text-sm font-medium text-slate-900">
             {monthLabel}
           </span>
           <Button variant="secondary" size="sm" onClick={() => changeMonth(1)}>
@@ -385,8 +385,8 @@ export function AttendanceForm({
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="sticky left-0 z-10 bg-gray-50 px-4 py-3 text-left font-medium text-gray-600 min-w-[160px]">
+                <tr className="border-b border-slate-200 bg-slate-50">
+                  <th className="sticky left-0 z-10 min-w-[160px] bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     F.I.Sh
                   </th>
                   {Array.from({ length: daysInMonth }, (_, i) => {
@@ -400,10 +400,10 @@ export function AttendanceForm({
                         key={day}
                         className={`px-1 py-3 text-center font-medium min-w-[44px] ${
                           future
-                            ? 'text-gray-300'
+                            ? 'text-slate-300'
                             : isToday
-                              ? 'text-amber-600 bg-amber-50'
-                              : 'text-gray-600'
+                              ? 'bg-indigo-50 text-indigo-600'
+                              : 'text-slate-600'
                         }`}
                       >
                         {day}
@@ -412,12 +412,12 @@ export function AttendanceForm({
                   })}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-slate-100">
                 {filteredWorkers.length === 0 ? (
                   <tr>
                     <td
                       colSpan={daysInMonth + 1}
-                      className="px-6 py-12 text-center text-gray-500"
+                      className="px-6 py-12 text-center text-slate-500"
                     >
                       {workers.length === 0
                         ? 'Faol ishchilar yo\'q'
@@ -426,14 +426,14 @@ export function AttendanceForm({
                   </tr>
                 ) : (
                   filteredWorkers.map((worker) => (
-                    <tr key={worker.id} className="hover:bg-gray-50">
-                      <td className="sticky left-0 z-10 bg-white px-4 py-3 font-medium text-gray-900 border-r border-gray-100">
-                        <div className="truncate max-w-[160px]">{worker.full_name}</div>
+                    <tr key={worker.id} className="hover:bg-slate-50">
+                      <td className="sticky left-0 z-10 border-r border-slate-100 bg-white px-4 py-3 font-medium text-slate-900">
+                        <div className="max-w-[160px] truncate">{worker.full_name}</div>
                         {isFemale12hWorker(worker) && (
                           <div className="text-xs text-indigo-600">12 soatlik</div>
                         )}
                         {worker.position && (
-                          <div className="text-xs text-gray-500 truncate">
+                          <div className="truncate text-xs text-slate-500">
                             {worker.position}
                           </div>
                         )}
@@ -460,11 +460,11 @@ export function AttendanceForm({
                           <td
                             key={dateStr}
                             className={`px-1 py-2 text-center ${
-                              future ? 'bg-gray-50' : ''
-                            } ${isSelected ? 'ring-2 ring-inset ring-amber-400' : ''}`}
+                              future ? 'bg-slate-50' : ''
+                            } ${isSelected ? 'ring-2 ring-inset ring-indigo-400' : ''}`}
                           >
                             {future ? (
-                              <span className="inline-block w-7 h-7 rounded text-gray-200">
+                              <span className="inline-block h-7 w-7 rounded text-slate-200">
                                 —
                               </span>
                             ) : isEditing ? (
@@ -480,7 +480,7 @@ export function AttendanceForm({
                                       : 'bg-green-100 text-green-700 hover:bg-green-200'
                                     : cell?.status === 'absent'
                                       ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                      : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
                                 }`}
                               >
                                 {cell?.status === 'present' ? (
@@ -501,7 +501,7 @@ export function AttendanceForm({
                                 onClick={() =>
                                   handleCellClick(worker.id, dateStr, worker.full_name)
                                 }
-                                className={`inline-flex items-center justify-center min-w-7 h-7 px-0.5 rounded text-[10px] font-medium transition-colors hover:ring-2 hover:ring-amber-300 ${
+                                className={`inline-flex h-7 min-w-7 items-center justify-center rounded px-0.5 text-[10px] font-medium transition-colors hover:ring-2 hover:ring-indigo-300 ${
                                   cell.status === 'present'
                                     ? isNightPresent
                                       ? 'bg-indigo-50 text-indigo-700'
@@ -516,7 +516,7 @@ export function AttendanceForm({
                                 )}
                               </button>
                             ) : (
-                              <span className="inline-block w-7 h-7 text-gray-300">·</span>
+                              <span className="inline-block h-7 w-7 text-slate-300">·</span>
                             )}
                           </td>
                         );
@@ -530,7 +530,7 @@ export function AttendanceForm({
         </CardContent>
       </Card>
 
-      <div className="mt-4 flex flex-wrap gap-4 text-xs text-gray-500">
+      <div className="mt-4 flex flex-wrap gap-4 text-xs text-slate-500">
         <span className="flex items-center gap-1">
           <span className="inline-flex w-5 h-5 items-center justify-center rounded bg-green-50 text-green-700">
             <Check className="h-3 w-3" />
@@ -556,13 +556,13 @@ export function AttendanceForm({
           Ishlamagan
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-5 h-5 rounded bg-gray-50 text-gray-300 text-center leading-5">
+          <span className="inline-block h-5 w-5 rounded bg-slate-50 text-center leading-5 text-slate-300">
             —
           </span>
           Hali kelmagan kun
         </span>
         {!isEditing && (
-          <span className="text-gray-400">
+          <span className="text-slate-400">
             Katakchani bosib batafsil ma&apos;lumotni ko&apos;ring
           </span>
         )}
@@ -609,13 +609,13 @@ export function AttendanceForm({
               </>
             ) : (
               <div className="space-y-1">
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-slate-700">
                   Kelmaslik sababi
                 </label>
                 <select
                   value={modalNotes}
                   onChange={(e) => setModalNotes(e.target.value)}
-                  className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
                 >
                   <option value="Sababsiz kelmadi">Sababsiz kelmadi</option>
                   <option value="Kasallik">Kasallik</option>

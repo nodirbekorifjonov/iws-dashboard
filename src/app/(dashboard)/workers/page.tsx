@@ -1,5 +1,6 @@
 import { getWorkers } from '@/lib/actions/workers';
 import { WorkersTable } from '@/components/workers/workers-table';
+import { PageHeader } from '@/components/layout/page-header';
 import { ADMIN_ROLES, requirePageRole } from '@/lib/auth/require-role';
 
 export default async function WorkersPage() {
@@ -8,13 +9,7 @@ export default async function WorkersPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Ishchilar</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Zavod ishchilarini boshqarish
-        </p>
-      </div>
-
+      <PageHeader title="Ishchilar" description="Zavod ishchilarini boshqarish" />
       <WorkersTable initialWorkers={workers} />
     </div>
   );

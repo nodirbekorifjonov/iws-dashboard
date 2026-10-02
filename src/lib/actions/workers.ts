@@ -13,7 +13,8 @@ import {
   provisionMissingWorkerLogins as apiProvisionMissingWorkerLogins,
   resetWorkerAuthPassword,
 } from '@/lib/api/worker-login';
-import { ADMIN_ROLES, requireRole } from '@/lib/auth/require-role';
+import { recordAudit } from '@/lib/api/audit';
+import { ADMIN_ROLES, ForbiddenError, requireRole } from '@/lib/auth/require-role';
 import {
   defaultHourlyRate,
   ShiftLength,
@@ -51,6 +52,9 @@ function errorText(err: unknown): string {
 }
 
 function workerActionError(err: unknown): string {
+  if (err instanceof ForbiddenError) {
+    return err.message;
+  }
   const message = errorText(err);
   if (
     message.includes('gender') ||
@@ -87,7 +91,7 @@ function workerPayload(formData: FormData) {
 }
 
 export async function createWorker(formData: FormData): Promise<{ error?: string }> {
-  await requireRole(ADMIN_ROLES);
+  const actor = await requireRole(ADMIN_ROLES);
   const gender = parseGender(formData.get('gender'));
   const shift_length = parseShiftLength(gender, formData.get('shift_length'));
   if (gender === 'female' && shift_length === null) {
@@ -100,6 +104,14 @@ export async function createWorker(formData: FormData): Promise<{ error?: string
       start_date:
         (formData.get('start_date') as string) ||
         new Date().toISOString().split('T')[0],
+    });
+    await recordAudit({
+      actor,
+      action: 'worker.create',
+      entityType: 'worker',
+      entityId: worker.id,
+      entityName: worker.full_name,
+      summary: `${actor.full_name} ${worker.full_name} ishchisini qo‘shdi`,
     });
     if (worker.login_code) {
       try {
@@ -131,7 +143,7 @@ export async function updateWorker(
   id: string,
   formData: FormData
 ): Promise<{ error?: string }> {
-  await requireRole(ADMIN_ROLES);
+  const actor = await requireRole(ADMIN_ROLES);
   const gender = parseGender(formData.get('gender'));
   const shift_length = parseShiftLength(gender, formData.get('shift_length'));
   if (gender === 'female' && shift_length === null) {
@@ -144,6 +156,14 @@ export async function updateWorker(
       ...payload,
       start_date: formData.get('start_date') as string,
       is_active: formData.get('is_active') === 'true',
+    });
+    await recordAudit({
+      actor,
+      action: 'worker.update',
+      entityType: 'worker',
+      entityId: id,
+      entityName: payload.full_name,
+      summary: `${actor.full_name} ${payload.full_name} ishchisini tahrirladi`,
     });
     if (
       existing?.user_id &&
@@ -163,9 +183,17 @@ export async function updateWorker(
 }
 
 export async function deleteWorker(id: string) {
-  await requireRole(ADMIN_ROLES);
+  const actor = await requireRole(ADMIN_ROLES);
   const worker = await apiGetWorkerById(id);
   await apiDeleteWorker(id);
+  await recordAudit({
+    actor,
+    action: 'worker.delete',
+    entityType: 'worker',
+    entityId: id,
+    entityName: worker?.full_name,
+    summary: `${actor.full_name} ${worker?.full_name || 'ishchi'}ni o‘chirdi`,
+  });
   if (worker?.user_id) {
     await deleteWorkerAuthUser(worker.user_id);
   }
@@ -179,9 +207,18 @@ export async function deleteWorker(id: string) {
 export async function createWorkerLogin(
   workerId: string
 ): Promise<{ error?: string; loginCode?: string; password?: string }> {
-  await requireRole(ADMIN_ROLES);
   try {
+    const actor = await requireRole(ADMIN_ROLES);
     const result = await createWorkerAuthLogin(workerId);
+    const worker = await apiGetWorkerById(workerId);
+    await recordAudit({
+      actor,
+      action: 'worker.login_create',
+      entityType: 'worker',
+      entityId: workerId,
+      entityName: worker?.full_name,
+      summary: `${actor.full_name} ${worker?.full_name || 'ishchi'} uchun kirish yaratdi`,
+    });
     revalidatePath('/workers');
     return {
       loginCode: result.loginCode ?? undefined,
@@ -195,9 +232,18 @@ export async function createWorkerLogin(
 export async function resetWorkerLogin(
   workerId: string
 ): Promise<{ error?: string; loginCode?: string; password?: string }> {
-  await requireRole(ADMIN_ROLES);
   try {
+    const actor = await requireRole(ADMIN_ROLES);
     const result = await resetWorkerAuthPassword(workerId);
+    const worker = await apiGetWorkerById(workerId);
+    await recordAudit({
+      actor,
+      action: 'worker.login_reset',
+      entityType: 'worker',
+      entityId: workerId,
+      entityName: worker?.full_name,
+      summary: `${actor.full_name} ${worker?.full_name || 'ishchi'} parolini yangiladi`,
+    });
     revalidatePath('/workers');
     return {
       loginCode: result.loginCode ?? undefined,
@@ -214,9 +260,16 @@ export async function provisionMissingWorkerLogins(): Promise<{
   failed?: number;
   errors?: string[];
 }> {
-  await requireRole(ADMIN_ROLES);
   try {
+    const actor = await requireRole(ADMIN_ROLES);
     const result = await apiProvisionMissingWorkerLogins();
+    await recordAudit({
+      actor,
+      action: 'worker.login_provision',
+      entityType: 'worker',
+      summary: `${actor.full_name} ${result.created} ta kirish yaratdi`,
+      metadata: { created: result.created, failed: result.failed },
+    });
     revalidatePath('/workers');
     return result;
   } catch (err) {

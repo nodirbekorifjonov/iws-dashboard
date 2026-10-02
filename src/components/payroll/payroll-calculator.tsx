@@ -121,7 +121,7 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
           <Button variant="secondary" size="sm" onClick={() => changeMonth(-1)}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="text-sm font-medium text-gray-900 min-w-[140px] text-center">
+          <span className="min-w-[140px] text-center text-sm font-medium text-slate-900">
             {monthLabel}
           </span>
           <Button variant="secondary" size="sm" onClick={() => changeMonth(1)}>
@@ -150,43 +150,31 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="data-table">
                 <thead>
-                  <tr className="border-b border-gray-200 bg-gray-50">
-                    <th className="px-6 py-3 text-left font-medium text-gray-600">
-                      F.I.Sh
-                    </th>
-                    <th className="px-6 py-3 text-left font-medium text-gray-600">
-                      Soatbay stavka
-                    </th>
-                    <th className="px-6 py-3 text-right font-medium text-gray-600">
-                      Ishlangan soat
-                    </th>
-                    <th className="px-6 py-3 text-right font-medium text-gray-600">
-                      Hisoblangan maosh
-                    </th>
-                    <th className="px-6 py-3 text-right font-medium text-gray-600">
-                      Avans
-                    </th>
-                    <th className="px-6 py-3 text-right font-medium text-gray-600">
-                      Qolgan summa
-                    </th>
+                  <tr>
+                    <th>F.I.Sh</th>
+                    <th>Soatbay stavka</th>
+                    <th className="text-right">Ishlangan soat</th>
+                    <th className="text-right">Hisoblangan maosh</th>
+                    <th className="text-right">Avans</th>
+                    <th className="text-right">Qolgan summa</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody>
                   {rows.map((row) => (
-                    <tr key={row.worker.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
-                        <div className="font-medium text-gray-900">
+                    <tr key={row.worker.id}>
+                      <td>
+                        <div className="font-medium text-slate-900">
                           {row.worker.full_name}
                         </div>
                         {row.worker.position && (
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-slate-500">
                             {row.worker.position}
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-gray-600">
+                      <td className="text-slate-600">
                         {isFemale12hWorker(row.worker) ? (
                           <div>
                             <div>
@@ -202,13 +190,13 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
                           `${formatCurrency(row.worker.hourly_rate)}/soat`
                         )}
                       </td>
-                      <td className="px-6 py-4 text-right font-medium text-gray-900">
+                      <td className="text-right font-medium text-slate-900">
                         {row.totalHours} soat
                       </td>
-                      <td className="px-6 py-4 text-right font-medium text-green-700">
+                      <td className="text-right font-medium text-emerald-700">
                         {formatCurrency(row.calculatedSalary)}
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="text-right">
                         <div className="flex items-center justify-end gap-2">
                           <input
                             type="number"
@@ -220,7 +208,7 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
                                 [row.worker.id]: e.target.value,
                               }))
                             }
-                            className="w-28 rounded-lg border border-gray-300 px-2 py-1 text-sm text-right"
+                            className="w-28 rounded-lg border border-slate-200 px-2 py-1 text-right text-sm"
                           />
                           <Button
                             variant="ghost"
@@ -232,7 +220,7 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
                           </Button>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right font-bold text-amber-700">
+                      <td className="text-right font-semibold text-indigo-700">
                         {formatCurrency(row.remainingAmount)}
                       </td>
                     </tr>
@@ -240,20 +228,20 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
                 </tbody>
                 {totals && (
                   <tfoot>
-                    <tr className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
-                      <td className="px-6 py-4 text-gray-900" colSpan={2}>
+                    <tr className="border-t-2 border-slate-200 bg-slate-50 font-semibold">
+                      <td className="px-6 py-4 text-slate-900" colSpan={2}>
                         Jami
                       </td>
-                      <td className="px-6 py-4 text-right text-gray-900">
+                      <td className="px-6 py-4 text-right text-slate-900">
                         {totals.hours} soat
                       </td>
-                      <td className="px-6 py-4 text-right text-green-700">
+                      <td className="px-6 py-4 text-right text-emerald-700">
                         {formatCurrency(totals.salary)}
                       </td>
-                      <td className="px-6 py-4 text-right text-gray-900">
+                      <td className="px-6 py-4 text-right text-slate-900">
                         {formatCurrency(totals.advance)}
                       </td>
-                      <td className="px-6 py-4 text-right text-amber-700">
+                      <td className="px-6 py-4 text-right text-indigo-700">
                         {formatCurrency(totals.remaining)}
                       </td>
                     </tr>
@@ -266,11 +254,11 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
       ) : (
         <Card>
           <CardContent className="py-16 text-center">
-            <Calculator className="mx-auto h-12 w-12 text-gray-300" />
-            <p className="mt-4 text-gray-500">
+            <Calculator className="mx-auto h-12 w-12 text-slate-300" />
+            <p className="mt-4 text-slate-500">
               Oylik maoshni hisoblash uchun &quot;Hisoblash&quot; tugmasini bosing
             </p>
-            <p className="mt-1 text-sm text-gray-400">
+            <p className="mt-1 text-sm text-slate-400">
               Davomat ma&apos;lumotlari asosida har bir ishchining oylik maoshi hisoblanadi
             </p>
           </CardContent>
