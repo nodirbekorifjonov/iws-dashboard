@@ -5,6 +5,8 @@ import { getProfileLogins } from '@/lib/api/logins';
 import { calculatePayroll } from '@/lib/api/payroll';
 import { isCreatorEmail, visibleRoleLabel } from '@/lib/auth/creator';
 import { createSupabaseAdminClient } from '@/lib/providers/supabase/admin';
+import { formatCurrency } from '@/lib/utils';
+import { auditContext } from '@/lib/utils/audit-context';
 import {
   AuditEvent,
   ControlAlert,
@@ -355,12 +357,15 @@ function buildAlerts(
   }
   for (const [key, list] of resets) {
     if (list.length < 2) continue;
+    const context = auditContext(list[0].action, list[0].metadata, list[0].entity_name);
     alerts.push({
       id: `reset-${key}`,
       title: 'Parol ko‘p marta yangilandi',
-      detail: `${list[0].entity_name || 'Ishchi'} uchun 24 soatda ${list.length} marta parol yangilandi.`,
+      detail: `Bo‘lim: ${context.section}. ${list[0].entity_name || 'Ishchi'} uchun 24 soatda ${list.length} marta parol yangilandi.`,
       createdAt: list[0].created_at,
       severity: 'warning',
+      section: context.section,
+      href: context.href,
     });
   }
 
@@ -368,34 +373,45 @@ function buildAlerts(
     if (event.action === 'payroll.advance' && isNightHour(event.created_at)) {
       const amount = Number(event.metadata?.amount ?? 0);
       if (amount >= LARGE_ADVANCE) {
+        const context = auditContext(event.action, event.metadata, event.entity_name);
+        const oldAmount = Number(event.metadata?.oldAmount ?? 0);
+        const workerName = event.entity_name || 'ishchi';
         alerts.push({
           id: `night-advance-${event.id}`,
           title: 'Kechasi katta avans',
-          detail: `${event.actor_name}: ${event.summary}`,
+          detail: `Bo‘lim: ${context.section}${context.monthLabel ? ` · Oy: ${context.monthLabel}` : ''}. ${event.actor_name} ${workerName} avansini ${formatCurrency(oldAmount)} → ${formatCurrency(amount)} qildi.`,
           createdAt: event.created_at,
           severity: 'danger',
+          section: context.section,
+          href: context.href,
         });
       }
     }
     if (event.action === 'attendance.save') {
       const count = Number(event.metadata?.count ?? 0);
       if (count >= 20) {
+        const context = auditContext(event.action, event.metadata, event.entity_name);
         alerts.push({
           id: `attendance-${event.id}`,
           title: 'Katta davomat o‘zgarishi',
-          detail: event.summary,
+          detail: `Bo‘lim: ${context.section}${context.monthLabel ? ` · Oy: ${context.monthLabel}` : ''}. ${event.actor_name} ${count} qator tahrirladi.`,
           createdAt: event.created_at,
           severity: 'warning',
+          section: context.section,
+          href: context.href,
         });
       }
     }
     if (event.action === 'worker.delete' && daysAgo(event.created_at) < 7) {
+      const context = auditContext(event.action, event.metadata, event.entity_name);
       alerts.push({
         id: `delete-${event.id}`,
         title: 'Ishchi o‘chirildi',
-        detail: event.summary,
+        detail: `Bo‘lim: ${context.section}. ${event.actor_name} ${event.entity_name || 'ishchi'} ni o‘chirdi.`,
         createdAt: event.created_at,
         severity: 'danger',
+        section: context.section,
+        href: context.href,
       });
     }
   }
@@ -407,9 +423,11 @@ function buildAlerts(
     alerts.push({
       id: `night-login-${event.full_name}-${event.logged_in_at}`,
       title: 'Kechasi xodim kirdi',
-      detail: `${event.full_name} kechasi tizimga kirdi.`,
+      detail: `Bo‘lim: Kirish. ${event.full_name} kechasi tizimga kirdi.`,
       createdAt: event.logged_in_at,
       severity: 'warning',
+      section: 'Kirish',
+      href: '/control',
     });
   }
 
@@ -420,9 +438,11 @@ function buildAlerts(
     alerts.push({
       id: `never-${row.id}`,
       title: 'Kirish yaratilgan, lekin kirmagan',
-      detail: `${row.fullName} (${row.loginCode || 'kod yo‘q'}) hali profiliga kirmagan.`,
+      detail: `Bo‘lim: Ishchilar. ${row.fullName} (${row.loginCode || 'kod yo‘q'}) hali profiliga kirmagan.`,
       createdAt: created || new Date().toISOString(),
       severity: 'warning',
+      section: 'Ishchilar',
+      href: '/workers',
     });
   }
 

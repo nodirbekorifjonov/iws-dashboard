@@ -13,9 +13,13 @@ import { calculatePayroll, updateAdvance } from '@/lib/actions/payroll';
 import { formatCurrency } from '@/lib/utils';
 import { exportPayrollToExcel } from '@/lib/utils/excel';
 import { formatMonthLabel } from '@/lib/utils/payroll';
+import {
+  WorkerSearchFilter,
+  useWorkerSearchFilter,
+} from '@/components/workers/worker-search-filter';
 import { Calculator, ChevronLeft, ChevronRight, Download, Save } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 interface PayrollCalculatorProps {
   month: string;
@@ -35,6 +39,25 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
   });
   const [savingAdvance, setSavingAdvance] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+
+  const workers = useMemo(() => rows?.map((row) => row.worker) ?? [], [rows]);
+  const {
+    query,
+    setQuery,
+    gender: filterGender,
+    setGender: setFilterGender,
+    shiftLength: filterShiftLength,
+    setShiftLength: setFilterShiftLength,
+    filteredWorkers,
+    hasActiveFilters,
+    clearFilters,
+  } = useWorkerSearchFilter(workers);
+
+  const filteredRows = useMemo(() => {
+    if (!rows) return null;
+    const ids = new Set(filteredWorkers.map((worker) => worker.id));
+    return rows.filter((row) => ids.has(row.worker.id));
+  }, [rows, filteredWorkers]);
 
   const monthLabel = formatMonthLabel(month);
 
@@ -105,12 +128,12 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
     }
   }
 
-  const totals = rows
+  const totals = filteredRows
     ? {
-        hours: rows.reduce((s, r) => s + r.totalHours, 0),
-        salary: rows.reduce((s, r) => s + r.calculatedSalary, 0),
-        advance: rows.reduce((s, r) => s + r.advanceAmount, 0),
-        remaining: rows.reduce((s, r) => s + r.remainingAmount, 0),
+        hours: filteredRows.reduce((s, r) => s + r.totalHours, 0),
+        salary: filteredRows.reduce((s, r) => s + r.calculatedSalary, 0),
+        advance: filteredRows.reduce((s, r) => s + r.advanceAmount, 0),
+        remaining: filteredRows.reduce((s, r) => s + r.remainingAmount, 0),
       }
     : null;
 
@@ -147,110 +170,134 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
       </div>
 
       {rows ? (
-        <Card>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>F.I.Sh</th>
-                    <th>Soatbay stavka</th>
-                    <th className="text-right">Ishlangan soat</th>
-                    <th className="text-right">Hisoblangan maosh</th>
-                    <th className="text-right">Avans</th>
-                    <th className="text-right">Qolgan summa</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.worker.id}>
-                      <td>
-                        <div className="font-medium text-slate-900">
-                          {row.worker.full_name}
-                        </div>
-                        {row.worker.position && (
-                          <div className="text-xs text-slate-500">
-                            {row.worker.position}
-                          </div>
-                        )}
-                      </td>
-                      <td className="text-slate-600">
-                        {isFemale12hWorker(row.worker) ? (
-                          <div>
-                            <div>
-                              Kunduzgi: {formatCurrency(roundMoney(female12hDayHourly()))}
-                              /soat
-                            </div>
-                            <div>
-                              Kechki: {formatCurrency(roundMoney(female12hNightHourly()))}
-                              /soat
-                            </div>
-                          </div>
-                        ) : (
-                          `${formatCurrency(row.worker.hourly_rate)}/soat`
-                        )}
-                      </td>
-                      <td className="text-right font-medium text-slate-900">
-                        {row.totalHours} soat
-                      </td>
-                      <td className="text-right font-medium text-emerald-700">
-                        {formatCurrency(row.calculatedSalary)}
-                      </td>
-                      <td className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <input
-                            type="number"
-                            min={0}
-                            value={advances[row.worker.id] ?? '0'}
-                            onChange={(e) =>
-                              setAdvances((prev) => ({
-                                ...prev,
-                                [row.worker.id]: e.target.value,
-                              }))
-                            }
-                            className="w-28 rounded-lg border border-slate-200 px-2 py-1 text-right text-sm"
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleSaveAdvance(row.worker.id)}
-                            disabled={savingAdvance === row.worker.id}
-                          >
-                            <Save className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                      <td className="text-right font-semibold text-indigo-700">
-                        {formatCurrency(row.remainingAmount)}
-                      </td>
+        <>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <WorkerSearchFilter
+              query={query}
+              onQueryChange={setQuery}
+              gender={filterGender}
+              onGenderChange={setFilterGender}
+              shiftLength={filterShiftLength}
+              onShiftLengthChange={setFilterShiftLength}
+              hasActiveFilters={hasActiveFilters}
+              onClearFilters={clearFilters}
+            />
+          </div>
+          <Card>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th className="w-12">№</th>
+                      <th>F.I.Sh</th>
+                      <th>Soatbay stavka</th>
+                      <th className="text-right">Ishlangan soat</th>
+                      <th className="text-right">Hisoblangan maosh</th>
+                      <th className="text-right">Avans</th>
+                      <th className="text-right">Qolgan summa</th>
                     </tr>
-                  ))}
-                </tbody>
-                {totals && (
-                  <tfoot>
-                    <tr className="border-t-2 border-slate-200 bg-slate-50 font-semibold">
-                      <td className="px-6 py-4 text-slate-900" colSpan={2}>
-                        Jami
-                      </td>
-                      <td className="px-6 py-4 text-right text-slate-900">
-                        {totals.hours} soat
-                      </td>
-                      <td className="px-6 py-4 text-right text-emerald-700">
-                        {formatCurrency(totals.salary)}
-                      </td>
-                      <td className="px-6 py-4 text-right text-slate-900">
-                        {formatCurrency(totals.advance)}
-                      </td>
-                      <td className="px-6 py-4 text-right text-indigo-700">
-                        {formatCurrency(totals.remaining)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                  </thead>
+                  <tbody>
+                    {filteredRows && filteredRows.length > 0 ? (
+                      filteredRows.map((row, index) => (
+                        <tr key={row.worker.id}>
+                          <td className="text-slate-500">{index + 1}</td>
+                          <td>
+                            <div className="font-medium text-slate-900">
+                              {row.worker.full_name}
+                            </div>
+                            {row.worker.position && (
+                              <div className="text-xs text-slate-500">
+                                {row.worker.position}
+                              </div>
+                            )}
+                          </td>
+                          <td className="text-slate-600">
+                            {isFemale12hWorker(row.worker) ? (
+                              <div>
+                                <div>
+                                  Kunduzgi: {formatCurrency(roundMoney(female12hDayHourly()))}
+                                  /soat
+                                </div>
+                                <div>
+                                  Kechki: {formatCurrency(roundMoney(female12hNightHourly()))}
+                                  /soat
+                                </div>
+                              </div>
+                            ) : (
+                              `${formatCurrency(row.worker.hourly_rate)}/soat`
+                            )}
+                          </td>
+                          <td className="text-right font-medium text-slate-900">
+                            {row.totalHours} soat
+                          </td>
+                          <td className="text-right font-medium text-emerald-700">
+                            {formatCurrency(row.calculatedSalary)}
+                          </td>
+                          <td className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <input
+                                type="number"
+                                min={0}
+                                value={advances[row.worker.id] ?? '0'}
+                                onChange={(e) =>
+                                  setAdvances((prev) => ({
+                                    ...prev,
+                                    [row.worker.id]: e.target.value,
+                                  }))
+                                }
+                                className="w-28 rounded-lg border border-slate-200 px-2 py-1 text-right text-sm"
+                              />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleSaveAdvance(row.worker.id)}
+                                disabled={savingAdvance === row.worker.id}
+                              >
+                                <Save className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                          <td className="text-right font-semibold text-indigo-700">
+                            {formatCurrency(row.remainingAmount)}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                          {rows.length === 0 ? "Faol ishchilar yo'q" : 'Ishchi topilmadi'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                  {totals && filteredRows && filteredRows.length > 0 && (
+                    <tfoot>
+                      <tr className="border-t-2 border-slate-200 bg-slate-50 font-semibold">
+                        <td className="px-6 py-4 text-slate-900" colSpan={3}>
+                          Jami
+                        </td>
+                        <td className="px-6 py-4 text-right text-slate-900">
+                          {totals.hours} soat
+                        </td>
+                        <td className="px-6 py-4 text-right text-emerald-700">
+                          {formatCurrency(totals.salary)}
+                        </td>
+                        <td className="px-6 py-4 text-right text-slate-900">
+                          {formatCurrency(totals.advance)}
+                        </td>
+                        <td className="px-6 py-4 text-right text-indigo-700">
+                          {formatCurrency(totals.remaining)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </>
       ) : (
         <Card>
           <CardContent className="py-16 text-center">

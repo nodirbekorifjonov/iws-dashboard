@@ -2,12 +2,13 @@ import { getDashboardStats } from '@/lib/actions/attendance';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { PageHeader } from '@/components/layout/page-header';
 import { StatCard } from '@/components/ui/stat-card';
-import { STAFF_ROLES, requirePageRole } from '@/lib/auth/require-role';
+import { ADMIN_ROLES, STAFF_ROLES, requirePageRole } from '@/lib/auth/require-role';
+import { UserRole } from '@/types/database';
 import { Users, CheckCircle, XCircle, Clock, Calculator, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 export default async function DashboardPage() {
-  await requirePageRole(STAFF_ROLES);
+  const profile = await requirePageRole(STAFF_ROLES);
   const stats = await getDashboardStats();
 
   const cards = [
@@ -43,20 +44,23 @@ export default async function DashboardPage() {
       title: 'Davomat',
       description: 'Oylik davomat jadvali',
       icon: CheckCircle,
+      roles: STAFF_ROLES as UserRole[],
     },
     {
       href: '/workers',
       title: 'Ishchilar ro‘yxati',
       description: 'Ishchilarni boshqarish',
       icon: Users,
+      roles: ADMIN_ROLES as UserRole[],
     },
     {
       href: '/payroll',
       title: 'Hisoblash',
       description: 'Oylik maosh hisob-kitobi',
       icon: Calculator,
+      roles: ADMIN_ROLES as UserRole[],
     },
-  ];
+  ].filter((link) => link.roles.includes(profile.role));
 
   return (
     <div>

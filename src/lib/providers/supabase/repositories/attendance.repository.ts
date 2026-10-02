@@ -113,13 +113,11 @@ export class SupabaseAttendanceRepository implements AttendanceRepository {
       todayAttendance?.filter((a) => a.status === 'late').length || 0;
     const explicitAbsent =
       todayAttendance?.filter((a) => a.status === 'absent').length || 0;
-    const marked = todayAttendance?.length || 0;
-    const unmarked = Math.max(0, (totalWorkers || 0) - marked);
 
     return {
       totalWorkers: totalWorkers || 0,
       todayPresent: present,
-      todayAbsent: explicitAbsent + unmarked,
+      todayAbsent: explicitAbsent,
       todayLate: late,
     };
   }

@@ -4,7 +4,9 @@ import {
   setStaffAccessDisabled,
   setWorkerLoginEnabled,
 } from '@/lib/actions/control';
-import { ControlCenterData } from '@/lib/api/control';
+import type { ControlCenterData } from '@/lib/api/control';
+import { auditContext } from '@/lib/utils/audit-context';
+import Link from 'next/link';
 import { cn, formatCurrency, formatDateTime, formatRelativeTime } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -200,14 +202,39 @@ export function ControlCenter({ data }: { data: ControlCenterData }) {
               />
             ) : (
               <ul className="divide-y divide-slate-100">
-                {data.audit.map((event) => (
-                  <li key={event.id} className="px-6 py-3">
-                    <p className="text-sm text-slate-900">{event.summary}</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      <ClientTime date={event.created_at} />
-                    </p>
-                  </li>
-                ))}
+                {data.audit.map((event) => {
+                  const context = auditContext(
+                    event.action,
+                    event.metadata,
+                    event.entity_name
+                  );
+                  return (
+                    <li key={event.id} className="px-6 py-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="info">{context.section}</Badge>
+                        {event.entity_name &&
+                        !/^\d{4}-\d{2}$/.test(event.entity_name) ? (
+                          <span className="text-xs text-slate-500">
+                            {event.entity_name}
+                          </span>
+                        ) : null}
+                        {context.monthLabel ? (
+                          <span className="text-xs text-slate-500">
+                            {context.monthLabel}
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 text-sm text-slate-900">{event.summary}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                        <span>{event.actor_name}</span>
+                        <ClientTime date={event.created_at} />
+                        <Link href={context.href} className="text-indigo-600 hover:text-indigo-800">
+                          Ochish
+                        </Link>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </CardContent>
@@ -225,11 +252,22 @@ export function ControlCenter({ data }: { data: ControlCenterData }) {
               <Card key={alert.id}>
                 <CardContent className="flex items-start justify-between gap-3 p-4">
                   <div>
-                    <p className="font-medium text-slate-900">{alert.title}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="info">{alert.section}</Badge>
+                      <p className="font-medium text-slate-900">{alert.title}</p>
+                    </div>
                     <p className="mt-1 text-sm text-slate-600">{alert.detail}</p>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
                       <ClientTime date={alert.createdAt} />
-                    </p>
+                      {alert.href ? (
+                        <Link
+                          href={alert.href}
+                          className="font-medium text-indigo-600 hover:text-indigo-800"
+                        >
+                          Ochish
+                        </Link>
+                      ) : null}
+                    </div>
                   </div>
                   <Badge variant={alert.severity === 'danger' ? 'danger' : 'warning'}>
                     {alert.severity === 'danger' ? 'Muhim' : 'Diqqat'}

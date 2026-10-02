@@ -107,6 +107,8 @@ export interface ControlAlert {
   detail: string;
   createdAt: string;
   severity: 'warning' | 'danger';
+  section: string;
+  href?: string;
 }
 
 export interface ControlLoginRow {

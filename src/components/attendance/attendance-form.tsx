@@ -10,6 +10,7 @@ import {
   AttendanceShift,
   AttendanceStatus,
   ATTENDANCE_SHIFT_LABELS,
+  ATTENDANCE_STATUS_LABELS,
   Worker,
   defaultHoursForWorker,
   isFemale12hWorker,
@@ -61,6 +62,45 @@ function presentCellLabel(hoursWorked: number, shift: AttendanceShift | null, sh
   return `${hoursWorked}${shift === 'night' ? 'T' : 'K'}`;
 }
 
+function isPaidStatus(status: AttendanceStatus) {
+  return status === 'present' || status === 'late';
+}
+
+function cellButtonClass(
+  cell: CellData | undefined,
+  isEditing: boolean,
+  isNightPresent: boolean
+) {
+  const base =
+    'inline-flex items-center justify-center min-w-7 h-7 px-0.5 rounded text-[10px] font-medium transition-colors';
+  if (!cell) {
+    return isEditing ? `${base} bg-slate-100 text-slate-400 hover:bg-slate-200` : `${base} text-slate-300`;
+  }
+  if (cell.status === 'present') {
+    if (isNightPresent) {
+      return isEditing
+        ? `${base} bg-indigo-100 text-indigo-700 hover:bg-indigo-200`
+        : `${base} bg-indigo-50 text-indigo-700`;
+    }
+    return isEditing
+      ? `${base} bg-green-100 text-green-700 hover:bg-green-200`
+      : `${base} bg-green-50 text-green-700`;
+  }
+  if (cell.status === 'late') {
+    return isEditing
+      ? `${base} bg-amber-100 text-amber-800 hover:bg-amber-200`
+      : `${base} bg-amber-50 text-amber-700`;
+  }
+  if (cell.status === 'absent') {
+    return isEditing
+      ? `${base} bg-red-100 text-red-700 hover:bg-red-200`
+      : `${base} bg-red-50 text-red-600`;
+  }
+  return isEditing
+    ? `${base} bg-slate-100 text-slate-500 hover:bg-slate-200`
+    : `${base} bg-slate-50 text-slate-500`;
+}
+
 export function AttendanceForm({
   month,
   workers,
@@ -85,17 +125,25 @@ export function AttendanceForm({
   const [modalNotes, setModalNotes] = useState('Sababsiz kelmadi');
 
   const buildInitialCells = useCallback(() => {
+    const workerMap = new Map(workers.map((worker) => [worker.id, worker]));
     const map: Record<string, CellData> = {};
     attendance.forEach((a) => {
+      const worker = workerMap.get(a.worker_id);
+      const needsShift = worker ? isFemale12hWorker(worker) : false;
+      const paid = isPaidStatus(a.status);
+      const shift =
+        needsShift && paid && a.shift !== 'day' && a.shift !== 'night'
+          ? 'day'
+          : (a.shift ?? null);
       map[cellKey(a.worker_id, a.date)] = {
         status: a.status,
         hoursWorked: a.hours_worked || 0,
         notes: a.notes || '',
-        shift: a.shift ?? null,
+        shift,
       };
     });
     return map;
-  }, [attendance]);
+  }, [attendance, workers]);
 
   const [cells, setCells] = useState<Record<string, CellData>>(buildInitialCells);
   const [exporting, setExporting] = useState(false);
@@ -294,8 +342,14 @@ export function AttendanceForm({
                   month: 'long',
                 })}
               </p>
-              {selectedCellData.status === 'present' ? (
+              {isPaidStatus(selectedCellData.status) ? (
                 <p className="mt-1 text-sm text-indigo-800">
+                  {selectedCellData.status === 'late' ? (
+                    <>
+                      Holat: <strong>{ATTENDANCE_STATUS_LABELS.late}</strong>
+                      {' · '}
+                    </>
+                  ) : null}
                   Ishlangan vaqt: <strong>{selectedCellData.hoursWorked} soat</strong>
                   {selectedWorker &&
                   isFemale12hWorker(selectedWorker) &&
@@ -386,7 +440,10 @@ export function AttendanceForm({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="sticky left-0 z-10 min-w-[160px] bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="sticky left-0 z-20 w-10 min-w-10 bg-slate-50 px-2 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    №
+                  </th>
+                  <th className="sticky left-10 z-20 min-w-[160px] bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     F.I.Sh
                   </th>
                   {Array.from({ length: daysInMonth }, (_, i) => {
@@ -416,7 +473,7 @@ export function AttendanceForm({
                 {filteredWorkers.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={daysInMonth + 1}
+                      colSpan={daysInMonth + 2}
                       className="px-6 py-12 text-center text-slate-500"
                     >
                       {workers.length === 0
@@ -425,9 +482,12 @@ export function AttendanceForm({
                     </td>
                   </tr>
                 ) : (
-                  filteredWorkers.map((worker) => (
+                  filteredWorkers.map((worker, index) => (
                     <tr key={worker.id} className="hover:bg-slate-50">
-                      <td className="sticky left-0 z-10 border-r border-slate-100 bg-white px-4 py-3 font-medium text-slate-900">
+                      <td className="sticky left-0 z-10 w-10 min-w-10 bg-white px-2 py-3 text-center text-sm text-slate-500">
+                        {index + 1}
+                      </td>
+                      <td className="sticky left-10 z-10 border-r border-slate-100 bg-white px-4 py-3 font-medium text-slate-900">
                         <div className="max-w-[160px] truncate">{worker.full_name}</div>
                         {isFemale12hWorker(worker) && (
                           <div className="text-xs text-indigo-600">12 soatlik</div>
@@ -447,8 +507,8 @@ export function AttendanceForm({
                         const isNightPresent =
                           cell?.status === 'present' && cell.shift === 'night';
                         const showShiftLabel = isFemale12hWorker(worker);
-                        const presentLabel =
-                          cell?.status === 'present'
+                        const hoursLabel =
+                          cell && isPaidStatus(cell.status)
                             ? presentCellLabel(
                                 cell.hoursWorked,
                                 cell.shift,
@@ -473,24 +533,20 @@ export function AttendanceForm({
                                 onClick={() =>
                                   handleCellClick(worker.id, dateStr, worker.full_name)
                                 }
-                                className={`inline-flex items-center justify-center min-w-7 h-7 px-0.5 rounded text-[10px] font-medium transition-colors ${
-                                  cell?.status === 'present'
-                                    ? isNightPresent
-                                      ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
-                                      : 'bg-green-100 text-green-700 hover:bg-green-200'
-                                    : cell?.status === 'absent'
-                                      ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                                      : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-                                }`}
+                                className={cellButtonClass(cell, true, isNightPresent)}
                               >
                                 {cell?.status === 'present' ? (
                                   showShiftLabel ? (
-                                    <span>{presentLabel}</span>
+                                    <span>{hoursLabel}</span>
                                   ) : (
                                     <Check className="h-4 w-4" />
                                   )
+                                ) : cell?.status === 'late' ? (
+                                  <span>{hoursLabel || 'Kech'}</span>
                                 ) : cell?.status === 'absent' ? (
                                   <X className="h-4 w-4" />
+                                ) : cell ? (
+                                  <span>{ATTENDANCE_STATUS_LABELS[cell.status]}</span>
                                 ) : (
                                   <span className="text-xs">+</span>
                                 )}
@@ -501,16 +557,12 @@ export function AttendanceForm({
                                 onClick={() =>
                                   handleCellClick(worker.id, dateStr, worker.full_name)
                                 }
-                                className={`inline-flex h-7 min-w-7 items-center justify-center rounded px-0.5 text-[10px] font-medium transition-colors hover:ring-2 hover:ring-indigo-300 ${
-                                  cell.status === 'present'
-                                    ? isNightPresent
-                                      ? 'bg-indigo-50 text-indigo-700'
-                                      : 'bg-green-50 text-green-700'
-                                    : 'bg-red-50 text-red-600'
-                                }`}
+                                className={`${cellButtonClass(cell, false, isNightPresent)} hover:ring-2 hover:ring-indigo-300`}
                               >
                                 {cell.status === 'present' ? (
-                                  <span>{presentLabel}</span>
+                                  <span>{hoursLabel}</span>
+                                ) : cell.status === 'late' ? (
+                                  <span>{hoursLabel || 'Kech'}</span>
                                 ) : (
                                   <X className="h-3.5 w-3.5" />
                                 )}
@@ -548,6 +600,12 @@ export function AttendanceForm({
             12T
           </span>
           Kechki smena
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-flex min-w-5 h-5 items-center justify-center rounded bg-amber-50 px-0.5 text-[10px] font-medium text-amber-700">
+            Kech
+          </span>
+          Kech qoldi
         </span>
         <span className="flex items-center gap-1">
           <span className="inline-flex w-5 h-5 items-center justify-center rounded bg-red-50 text-red-600">
