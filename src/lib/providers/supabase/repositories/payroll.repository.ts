@@ -3,8 +3,9 @@ import {
   PayrollCalculationResult,
   UpdateAdvanceInput,
 } from '@/lib/repositories/types';
-import { Advance } from '@/types/database';
+import { Advance, Attendance } from '@/types/database';
 import { calculatePayroll, getMonthDateRange, workersVisibleForMonth } from '@/lib/utils/payroll';
+import { fetchAllPages } from '../fetch-all';
 import { createSupabaseServerClient } from '../server';
 
 export class SupabasePayrollRepository implements PayrollRepository {
@@ -21,13 +22,16 @@ export class SupabasePayrollRepository implements PayrollRepository {
 
     if (workersError) throw workersError;
 
-    const { data: attendance, error: attendanceError } = await supabase
-      .from('attendance')
-      .select('*')
-      .gte('date', startDate)
-      .lte('date', endDate);
-
-    if (attendanceError) throw attendanceError;
+    const attendance = await fetchAllPages<Attendance>((from, to) =>
+      supabase
+        .from('attendance')
+        .select('*')
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('worker_id', { ascending: true })
+        .order('date', { ascending: true })
+        .range(from, to)
+    );
 
     const { data: advances, error: advancesError } = await supabase
       .from('advances')

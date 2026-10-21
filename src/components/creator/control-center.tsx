@@ -51,7 +51,6 @@ export function ControlCenter({ data }: { data: ControlCenterData }) {
     setBusy(id);
     try {
       await setWorkerLoginEnabled(id, enabled);
-      router.refresh();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Xatolik');
     } finally {
@@ -63,7 +62,6 @@ export function ControlCenter({ data }: { data: ControlCenterData }) {
     setBusy(id);
     try {
       await setStaffAccessDisabled(id, disabled);
-      router.refresh();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Xatolik');
     } finally {

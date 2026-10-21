@@ -13,14 +13,12 @@ import {
 } from '@/lib/actions/locations';
 import { Plus, Pencil, Trash2, MapPin } from 'lucide-react';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 interface LocationsGridProps {
   initialLocations: WorkLocation[];
 }
 
 export function LocationsGrid({ initialLocations }: LocationsGridProps) {
-  const router = useRouter();
   const [showModal, setShowModal] = useState(false);
   const [editingLocation, setEditingLocation] = useState<WorkLocation | null>(null);
   const [loading, setLoading] = useState(false);
@@ -48,7 +46,6 @@ export function LocationsGrid({ initialLocations }: LocationsGridProps) {
         await createLocation(formData);
       }
       setShowModal(false);
-      router.refresh();
     } catch {
       alert('Xatolik yuz berdi');
     } finally {
@@ -61,7 +58,6 @@ export function LocationsGrid({ initialLocations }: LocationsGridProps) {
 
     try {
       await deleteLocation(id);
-      router.refresh();
     } catch {
       alert('O\'chirishda xatolik');
     }

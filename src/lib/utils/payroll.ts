@@ -2,7 +2,13 @@ import {
   ABSENCE_REASON_LABELS,
   Advance,
   Attendance,
+  attendanceHasExtraWork,
   hourlyRateForAttendance,
+  isMaleWorker,
+  MALE_EXTRA_WORK_PAY,
+  maleDailyRate,
+  maleDayPay,
+  maleStavkaFromStored,
   PayrollRow,
   roundMoney,
   Worker,
@@ -18,7 +24,10 @@ export function calculatePayroll(
   const monthPrefix = month.slice(0, 7);
 
   return workers.map((worker) => {
-    const hourlyRate = toNumber(worker.hourly_rate);
+    const male = isMaleWorker(worker);
+    const hourlyRate = male
+      ? maleDailyRate(toNumber(worker.hourly_rate))
+      : toNumber(worker.hourly_rate);
     const workerAttendance = attendance.filter(
       (a) => a.worker_id === worker.id && a.date.startsWith(monthPrefix)
     );
@@ -27,18 +36,43 @@ export function calculatePayroll(
       (a) => a.status === 'present' || a.status === 'late'
     );
 
-    const totalHours = paidRecords.reduce(
-      (sum, a) => sum + toNumber(a.hours_worked),
-      0
-    );
+    const totalStavka = male
+      ? roundMoney(
+          paidRecords.reduce(
+            (sum, a) => sum + maleStavkaFromStored(toNumber(a.hours_worked)),
+            0
+          )
+        )
+      : 0;
+
+    const extraWorkPay = male
+      ? roundMoney(
+          paidRecords.filter((record) => attendanceHasExtraWork(record.notes)).length *
+            MALE_EXTRA_WORK_PAY
+        )
+      : 0;
+
+    const totalHours = male
+      ? 0
+      : paidRecords.reduce((sum, a) => sum + toNumber(a.hours_worked), 0);
 
     const calculatedSalary = roundMoney(
-      paidRecords.reduce(
-        (sum, a) =>
+      paidRecords.reduce((sum, record) => {
+        if (male) {
+          return (
+            sum +
+            maleDayPay(
+              hourlyRate,
+              maleStavkaFromStored(toNumber(record.hours_worked)),
+              attendanceHasExtraWork(record.notes)
+            )
+          );
+        }
+        return (
           sum +
-          toNumber(a.hours_worked) * hourlyRateForAttendance(worker, a.shift),
-        0
-      )
+          toNumber(record.hours_worked) * hourlyRateForAttendance(worker, record.shift)
+        );
+      }, 0)
     );
 
     const advance = advances.find(
@@ -50,6 +84,8 @@ export function calculatePayroll(
     return {
       worker: { ...worker, hourly_rate: hourlyRate },
       totalHours,
+      totalStavka,
+      extraWorkPay,
       calculatedSalary,
       advanceAmount,
       remainingAmount,
@@ -104,11 +140,45 @@ export function formatMonthLabel(month: string): string {
   return `${UZ_MONTHS[mon - 1] ?? month} ${year}`;
 }
 
+const UZ_WEEKDAYS = [
+  'yakshanba',
+  'dushanba',
+  'seshanba',
+  'chorshanba',
+  'payshanba',
+  'juma',
+  'shanba',
+];
+
+export function formatTashkentTodayLabel(now = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tashkent',
+    weekday: 'short',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  }).formatToParts(now);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? '';
+  const weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(part('weekday'));
+  const month = Number(part('month')) - 1;
+  return `${UZ_WEEKDAYS[weekday] ?? part('weekday')}, ${part('day')}-${UZ_MONTHS[month] ?? part('month')}, ${part('year')}`;
+}
+
+const TASHKENT_TIME_ZONE = 'Asia/Tashkent';
+
+/** Server va brauzer bir xil kunni ko'rsin. Toshkent yarim tunda UTC hali kecha bo'ladi. */
+export function todayInTashkent(now = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: TASHKENT_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}
+
 export function isFutureDate(dateStr: string): boolean {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const date = new Date(dateStr + 'T00:00:00');
-  return date > today;
+  return dateStr > todayInTashkent();
 }
 
 export function getMonthDates(month: string): string[] {

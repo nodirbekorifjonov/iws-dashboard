@@ -12,7 +12,12 @@ export type ShiftLength = 8 | 12;
 export type AttendanceShift = 'day' | 'night';
 
 export const MALE_SHIFT_PAY = 140_000;
+export const MALE_DAILY_PAY = MALE_SHIFT_PAY;
 export const MALE_SHIFT_HOURS = 12;
+export const MALE_EXTRA_WORK_PAY = 50_000;
+export const MALE_EXTRA_WORK_NOTE = 'extra_work';
+export const MALE_STAVKA_OPTIONS = [0.5, 1, 1.5, 2] as const;
+export type MaleStavka = (typeof MALE_STAVKA_OPTIONS)[number];
 export const FEMALE_8H_HOURLY_RATE = 15_000;
 export const FEMALE_HOURLY_RATE = FEMALE_8H_HOURLY_RATE;
 export const FEMALE_12H_HOURS = 12;
@@ -36,12 +41,63 @@ export function defaultHourlyRate(
   shiftLength?: ShiftLength | null
 ): number {
   if (gender === 'male') {
-    return roundMoney(MALE_SHIFT_PAY / MALE_SHIFT_HOURS);
+    return MALE_DAILY_PAY;
   }
   if (shiftLength === 12) {
     return roundMoney(female12hDayHourly());
   }
   return FEMALE_8H_HOURLY_RATE;
+}
+
+export function isMaleWorker(worker: Pick<Worker, 'gender'>): boolean {
+  return worker.gender === 'male';
+}
+
+/** Erkak `hourly_rate` i 1 stavkaning kunlik summasi. Eski yozuvlar soatbay saqlangan. */
+export function maleDailyRate(storedRate: number): number {
+  const rate = Number(storedRate) || 0;
+  if (rate <= 0) return MALE_DAILY_PAY;
+  if (rate < MALE_DAILY_PAY / 2) {
+    return Math.round(rate * MALE_SHIFT_HOURS);
+  }
+  return Math.round(rate);
+}
+
+export function isMaleStavka(value: number): value is MaleStavka {
+  return MALE_STAVKA_OPTIONS.some((option) => Math.abs(option - value) < 0.001);
+}
+
+export function nearestMaleStavka(value: number): MaleStavka {
+  return MALE_STAVKA_OPTIONS.reduce((best, option) =>
+    Math.abs(option - value) < Math.abs(best - value) ? option : best
+  );
+}
+
+/**
+ * Erkak davomatida `hours_worked` stavkani saqlaydi: 0.5, 1, 1.5 yoki 2.
+ * 2 dan katta qiymatlar eski soat yozuvi (12 soat = 1 stavka).
+ */
+export function maleStavkaFromStored(hoursWorked: number): number {
+  const hours = Number(hoursWorked) || 0;
+  if (hours <= 0) return 0;
+  const stavka = hours > 2 ? roundMoney(hours / MALE_SHIFT_HOURS) : roundMoney(hours);
+  if (isMaleStavka(stavka)) return stavka;
+  return nearestMaleStavka(stavka);
+}
+
+export function formatStavka(value: number): string {
+  const rounded = roundMoney(value);
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+}
+
+export function attendanceHasExtraWork(notes: string | null | undefined): boolean {
+  return (notes ?? '').trim() === MALE_EXTRA_WORK_NOTE;
+}
+
+export function maleDayPay(dailyRate: number, stavka: number, extraWork = false): number {
+  return roundMoney(
+    (Number(dailyRate) || 0) * (Number(stavka) || 0) + (extraWork ? MALE_EXTRA_WORK_PAY : 0)
+  );
 }
 
 export interface Profile {
@@ -183,6 +239,8 @@ export interface Advance {
 export interface PayrollRow {
   worker: Worker;
   totalHours: number;
+  totalStavka: number;
+  extraWorkPay: number;
   calculatedSalary: number;
   advanceAmount: number;
   remainingAmount: number;

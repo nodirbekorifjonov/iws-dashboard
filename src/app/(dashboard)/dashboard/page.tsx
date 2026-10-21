@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { StatCard } from '@/components/ui/stat-card';
 import { ADMIN_ROLES, STAFF_ROLES, requirePageRole } from '@/lib/auth/require-role';
 import { UserRole } from '@/types/database';
+import { formatTashkentTodayLabel } from '@/lib/utils/payroll';
 import { Users, CheckCircle, XCircle, Clock, Calculator, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
@@ -66,12 +67,7 @@ export default async function DashboardPage() {
     <div>
       <PageHeader
         title="Bosh sahifa"
-        description={`Bugungi holat — ${new Date().toLocaleDateString('uz-UZ', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        })}`}
+        description={`Bugungi holat — ${formatTashkentTodayLabel()}`}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

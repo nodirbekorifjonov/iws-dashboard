@@ -1,12 +1,11 @@
 'use client';
 
-import { pingActivity } from '@/lib/actions/activity';
 import { useEffect } from 'react';
 
 export function ActivityHeartbeat() {
   useEffect(() => {
     const ping = () => {
-      void pingActivity();
+      void fetch('/api/activity', { method: 'POST', keepalive: true }).catch(() => {});
     };
     ping();
     const id = window.setInterval(ping, 60_000);

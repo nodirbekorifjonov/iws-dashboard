@@ -20,6 +20,9 @@ import {
   female12hDayHourly,
   female12hNightHourly,
   isFemale12hWorker,
+  isMaleWorker,
+  MALE_EXTRA_WORK_PAY,
+  maleDailyRate,
   roundMoney,
 } from '@/types/database';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -38,14 +41,12 @@ import {
 import { workerDefaultPassword } from '@/lib/utils/worker-login';
 import { KeyRound, Pencil, Plus, Trash2, UserPlus } from 'lucide-react';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 interface WorkersTableProps {
   initialWorkers: Worker[];
 }
 
 export function WorkersTable({ initialWorkers }: WorkersTableProps) {
-  const router = useRouter();
   const [showModal, setShowModal] = useState(false);
   const [editingWorker, setEditingWorker] = useState<Worker | null>(null);
   const [loading, setLoading] = useState(false);
@@ -84,7 +85,11 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
     setEditingWorker(worker);
     setGender(worker.gender ?? '');
     setShiftLength(worker.shift_length ?? '');
-    setHourlyRate(worker.hourly_rate ? String(worker.hourly_rate) : '');
+    setHourlyRate(
+      worker.hourly_rate
+        ? String(isMaleWorker(worker) ? maleDailyRate(worker.hourly_rate) : worker.hourly_rate)
+        : ''
+    );
     setShowModal(true);
   }
 
@@ -131,7 +136,6 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
         return;
       }
       setShowModal(false);
-      router.refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Xatolik yuz berdi';
       alert(message);
@@ -145,7 +149,6 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
 
     try {
       await deleteWorker(id);
-      router.refresh();
     } catch {
       alert('O\'chirishda xatolik');
     }
@@ -187,7 +190,6 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
         title: worker.user_id ? 'Parol yangilandi' : 'Kirish yaratildi',
         message: `Kod: ${result.loginCode || worker.login_code}\nParol: ${password}\n\nParol = kod + ism, bo‘sh joysiz.`,
       });
-      router.refresh();
     } catch (err) {
       setConfirmDialog(null);
       setFeedback({
@@ -216,7 +218,6 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
         title: 'Kirish yaratildi',
         message: `${result.created ?? 0} ta kirish yaratildi.${failedNote}`,
       });
-      router.refresh();
     } catch (err) {
       setConfirmDialog(null);
       setFeedback({
@@ -379,7 +380,7 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
                   <th>Lavozim</th>
                   <th>Telefon</th>
                   <th>Ish boshlagan</th>
-                  <th>Soatbay stavka</th>
+                  <th>Stavka</th>
                   <th>Holat</th>
                   <th className="text-right">Amallar</th>
                 </tr>
@@ -429,6 +430,8 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
                               Kechki: {formatCurrency(roundMoney(female12hNightHourly()))}/soat
                             </div>
                           </div>
+                        ) : isMaleWorker(worker) ? (
+                          `${formatCurrency(maleDailyRate(worker.hourly_rate))}/kun`
                         ) : (
                           `${formatCurrency(worker.hourly_rate)}/soat`
                         )}
@@ -567,7 +570,11 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
               <Input
                 id="hourly_rate"
                 name="hourly_rate"
-                label="Soatbay stavka (so'm/soat)"
+                label={
+                  gender === 'male'
+                    ? "Kunlik stavka (1 stavka, so'm)"
+                    : "Soatbay stavka (so'm/soat)"
+                }
                 type="number"
                 value={hourlyRate}
                 onChange={(e) => setHourlyRate(e.target.value)}
@@ -577,7 +584,7 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
               />
               <p className="mt-1 text-xs text-slate-500">
                 {gender === 'male'
-                  ? 'Erkak: 140 000 so\'m / 12 soat. Qiymatni qo\'lda o\'zgartirish mumkin.'
+                  ? `1 stavka = shu summa. Davomatda 0.5, 1, 1.5 yoki 2 stavka belgilanadi. Qo'shimcha ish kuniga ${formatCurrency(MALE_EXTRA_WORK_PAY)}.`
                   : '8 soatlik: 15 000 so\'m/soat (8 soat = 120 000 so\'m). Qo\'shimcha soatlar shu stavkada.'}
               </p>
             </div>

@@ -6,12 +6,14 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatDate(date: string | Date): string {
+  if (typeof date === 'string') {
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(date);
+    if (match) return `${match[3]}.${match[2]}.${match[1]}`;
+  }
   const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleDateString('uz-UZ', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${day}.${month}.${d.getFullYear()}`;
 }
 
 export function formatDateTime(date: string | Date): string {

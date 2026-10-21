@@ -1,4 +1,8 @@
 import { ActivityHeartbeat } from '@/components/layout/activity-heartbeat';
+import { pingActivity } from '@/lib/actions/activity';
+
+// Tabs opened before the heartbeat moved to /api/activity still call this action.
+void pingActivity;
 import { getSessionUser, signOut } from '@/lib/actions/auth';
 import { getLoginBlockReason } from '@/lib/api/access';
 import { requirePageRole } from '@/lib/auth/require-role';

@@ -12,8 +12,19 @@ import {
   ATTENDANCE_SHIFT_LABELS,
   ATTENDANCE_STATUS_LABELS,
   Worker,
+  attendanceHasExtraWork,
   defaultHoursForWorker,
+  formatStavka,
   isFemale12hWorker,
+  isMaleStavka,
+  isMaleWorker,
+  MALE_EXTRA_WORK_NOTE,
+  MALE_EXTRA_WORK_PAY,
+  MALE_STAVKA_OPTIONS,
+  maleDailyRate,
+  maleDayPay,
+  maleStavkaFromStored,
+  nearestMaleStavka,
 } from '@/types/database';
 import { saveAttendanceBatch } from '@/lib/actions/attendance';
 import {
@@ -22,8 +33,10 @@ import {
   getMonthDates,
   isFutureDate,
   formatMonthLabel,
+  todayInTashkent,
 } from '@/lib/utils/payroll';
 import { exportAttendanceToExcel } from '@/lib/utils/excel';
+import { formatCurrency } from '@/lib/utils';
 import {
   WorkerSearchFilter,
   useWorkerSearchFilter,
@@ -38,7 +51,7 @@ import {
   Download,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface CellData {
   status: AttendanceStatus;
@@ -57,7 +70,19 @@ function cellKey(workerId: string, date: string) {
   return `${workerId}:${date}`;
 }
 
-function presentCellLabel(hoursWorked: number, shift: AttendanceShift | null, showShift: boolean) {
+function presentCellLabel(
+  worker: Pick<Worker, 'gender'>,
+  hoursWorked: number,
+  shift: AttendanceShift | null,
+  showShift: boolean,
+  notes: string
+) {
+  if (isMaleWorker(worker)) {
+    const stavka = maleStavkaFromStored(hoursWorked);
+    if (stavka <= 0) return '';
+    const label = formatStavka(stavka);
+    return attendanceHasExtraWork(notes) ? `${label}+` : label;
+  }
   if (!showShift || !shift) return `${hoursWorked}s`;
   return `${hoursWorked}${shift === 'night' ? 'T' : 'K'}`;
 }
@@ -122,6 +147,7 @@ export function AttendanceForm({
   } | null>(null);
   const [modalHours, setModalHours] = useState('8');
   const [modalShift, setModalShift] = useState<AttendanceShift | ''>('');
+  const [modalExtra, setModalExtra] = useState(false);
   const [modalNotes, setModalNotes] = useState('Sababsiz kelmadi');
 
   const buildInitialCells = useCallback(() => {
@@ -146,6 +172,23 @@ export function AttendanceForm({
   }, [attendance, workers]);
 
   const [cells, setCells] = useState<Record<string, CellData>>(buildInitialCells);
+  const isEditingRef = useRef(false);
+  const attendanceRevision = attendance
+    .map(
+      (row) =>
+        `${row.worker_id}:${row.date}:${row.status}:${row.hours_worked}:${row.shift ?? ''}:${row.notes ?? ''}`
+    )
+    .join(';');
+
+  useEffect(() => {
+    isEditingRef.current = isEditing;
+  }, [isEditing]);
+
+  useEffect(() => {
+    if (!isEditingRef.current) {
+      setCells(buildInitialCells());
+    }
+  }, [attendanceRevision, buildInitialCells]);
   const [exporting, setExporting] = useState(false);
   const {
     query,
@@ -184,10 +227,18 @@ export function AttendanceForm({
     if (isEditing) {
       const existing = getCell(workerId, date);
       const worker = workerById(workerId);
-      const defaultHours = worker ? defaultHoursForWorker(worker) : 8;
-      setModalHours(
-        existing?.hoursWorked ? String(existing.hoursWorked) : String(defaultHours)
-      );
+      if (worker && isMaleWorker(worker)) {
+        const current = existing?.hoursWorked
+          ? nearestMaleStavka(maleStavkaFromStored(existing.hoursWorked))
+          : 1;
+        setModalHours(String(current));
+      } else {
+        const defaultHours = worker ? defaultHoursForWorker(worker) : 8;
+        setModalHours(
+          existing?.hoursWorked ? String(existing.hoursWorked) : String(defaultHours)
+        );
+      }
+      setModalExtra(existing ? attendanceHasExtraWork(existing.notes) : false);
       setModalShift(
         existing?.shift === 'night' || existing?.shift === 'day' ? existing.shift : ''
       );
@@ -207,10 +258,18 @@ export function AttendanceForm({
 
   function handleMarkPresent() {
     if (!editModal) return;
-    const hours = parseFloat(modalHours) || 0;
-    if (hours <= 0) return;
-
     const worker = workerById(editModal.workerId);
+    const male = worker ? isMaleWorker(worker) : false;
+    const hours = parseFloat(modalHours) || 0;
+    if (male) {
+      if (!isMaleStavka(hours)) {
+        alert('Stavkani tanlang: 0.5, 1, 1.5 yoki 2');
+        return;
+      }
+    } else if (hours <= 0) {
+      return;
+    }
+
     const needsShift = worker ? isFemale12hWorker(worker) : false;
     if (needsShift && modalShift !== 'day' && modalShift !== 'night') {
       alert('Kunduzgi yoki kechki smenani tanlang');
@@ -223,7 +282,7 @@ export function AttendanceForm({
       [key]: {
         status: 'present',
         hoursWorked: hours,
-        notes: '',
+        notes: male && modalExtra ? MALE_EXTRA_WORK_NOTE : '',
         shift: needsShift && (modalShift === 'day' || modalShift === 'night')
           ? modalShift
           : null,
@@ -269,18 +328,24 @@ export function AttendanceForm({
     try {
       const records = Object.entries(cells).map(([key, data]) => {
         const [workerId, date] = key.split(':');
+        const worker = workerById(workerId);
+        const paid = data.status === 'present' || data.status === 'late';
+        const hoursWorked =
+          worker && isMaleWorker(worker) && paid
+            ? maleStavkaFromStored(data.hoursWorked)
+            : data.hoursWorked;
         return {
           workerId,
           date,
           status: data.status,
-          hoursWorked: data.hoursWorked,
+          hoursWorked,
           shift: data.shift,
           notes: data.notes || undefined,
         };
       });
       await saveAttendanceBatch(records);
+      isEditingRef.current = false;
       setIsEditing(false);
-      router.refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Saqlashda xatolik';
       alert(message);
@@ -322,6 +387,9 @@ export function AttendanceForm({
   const editNeedsShift = editModalWorker
     ? isFemale12hWorker(editModalWorker)
     : false;
+  const editIsMale = editModalWorker ? isMaleWorker(editModalWorker) : false;
+  const editDailyRate = editModalWorker ? maleDailyRate(editModalWorker.hourly_rate) : 0;
+  const editStavka = Number(modalHours) || 0;
 
   const shiftOptions = [
     { value: '', label: 'Smenani tanlang' },
@@ -350,7 +418,36 @@ export function AttendanceForm({
                       {' · '}
                     </>
                   ) : null}
-                  Ishlangan vaqt: <strong>{selectedCellData.hoursWorked} soat</strong>
+                  {selectedWorker && isMaleWorker(selectedWorker) ? (
+                    <>
+                      Stavka:{' '}
+                      <strong>
+                        {formatStavka(maleStavkaFromStored(selectedCellData.hoursWorked))}
+                      </strong>
+                      {attendanceHasExtraWork(selectedCellData.notes) ? (
+                        <>
+                          {' · '}
+                          Qo&apos;shimcha ish:{' '}
+                          <strong>{formatCurrency(MALE_EXTRA_WORK_PAY)}</strong>
+                        </>
+                      ) : null}
+                      {' · '}
+                      Kunlik:{' '}
+                      <strong>
+                        {formatCurrency(
+                          maleDayPay(
+                            maleDailyRate(selectedWorker.hourly_rate),
+                            maleStavkaFromStored(selectedCellData.hoursWorked),
+                            attendanceHasExtraWork(selectedCellData.notes)
+                          )
+                        )}
+                      </strong>
+                    </>
+                  ) : (
+                    <>
+                      Ishlangan vaqt: <strong>{selectedCellData.hoursWorked} soat</strong>
+                    </>
+                  )}
                   {selectedWorker &&
                   isFemale12hWorker(selectedWorker) &&
                   selectedCellData.shift ? (
@@ -450,8 +547,7 @@ export function AttendanceForm({
                     const day = i + 1;
                     const dateStr = dates[i];
                     const future = isFutureDate(dateStr);
-                    const isToday =
-                      dateStr === new Date().toISOString().split('T')[0];
+                    const isToday = dateStr === todayInTashkent();
                     return (
                       <th
                         key={day}
@@ -489,6 +585,9 @@ export function AttendanceForm({
                       </td>
                       <td className="sticky left-10 z-10 border-r border-slate-100 bg-white px-4 py-3 font-medium text-slate-900">
                         <div className="max-w-[160px] truncate">{worker.full_name}</div>
+                        {isMaleWorker(worker) && (
+                          <div className="text-xs text-indigo-600">Kunbay</div>
+                        )}
                         {isFemale12hWorker(worker) && (
                           <div className="text-xs text-indigo-600">12 soatlik</div>
                         )}
@@ -507,12 +606,15 @@ export function AttendanceForm({
                         const isNightPresent =
                           cell?.status === 'present' && cell.shift === 'night';
                         const showShiftLabel = isFemale12hWorker(worker);
+                        const maleWorker = isMaleWorker(worker);
                         const hoursLabel =
                           cell && isPaidStatus(cell.status)
                             ? presentCellLabel(
+                                worker,
                                 cell.hoursWorked,
                                 cell.shift,
-                                showShiftLabel
+                                showShiftLabel,
+                                cell.notes
                               )
                             : '';
 
@@ -536,7 +638,7 @@ export function AttendanceForm({
                                 className={cellButtonClass(cell, true, isNightPresent)}
                               >
                                 {cell?.status === 'present' ? (
-                                  showShiftLabel ? (
+                                  showShiftLabel || maleWorker ? (
                                     <span>{hoursLabel}</span>
                                   ) : (
                                     <Check className="h-4 w-4" />
@@ -591,6 +693,18 @@ export function AttendanceForm({
         </span>
         <span className="flex items-center gap-1">
           <span className="inline-flex min-w-5 h-5 items-center justify-center rounded bg-green-50 px-0.5 text-[10px] font-medium text-green-700">
+            1
+          </span>
+          Erkak stavkasi (0.5, 1, 1.5, 2)
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-flex min-w-5 h-5 items-center justify-center rounded bg-green-50 px-0.5 text-[10px] font-medium text-green-700">
+            1+
+          </span>
+          Qo&apos;shimcha ish ({formatCurrency(MALE_EXTRA_WORK_PAY)})
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-flex min-w-5 h-5 items-center justify-center rounded bg-green-50 px-0.5 text-[10px] font-medium text-green-700">
             12K
           </span>
           Kunduzgi smena
@@ -633,14 +747,49 @@ export function AttendanceForm({
           title={
             editModal.mode === 'absent'
               ? 'Kelmaslik sababi'
-              : editNeedsShift
-                ? 'Ishlangan soatlar va smena'
-                : 'Ishlangan soatlar'
+              : editIsMale
+                ? 'Kunlik stavka'
+                : editNeedsShift
+                  ? 'Ishlangan soatlar va smena'
+                  : 'Ishlangan soatlar'
           }
         >
           <div className="space-y-4">
             {editModal.mode === 'present' ? (
               <>
+                {editIsMale ? (
+                  <>
+                    <Select
+                      id="stavka"
+                      label="Stavka"
+                      required
+                      value={modalHours}
+                      onChange={(e) => setModalHours(e.target.value)}
+                      options={MALE_STAVKA_OPTIONS.map((value) => ({
+                        value: String(value),
+                        label: `${formatStavka(value)} stavka`,
+                      }))}
+                    />
+                    <label className="flex items-start gap-3 rounded-lg border border-slate-200 px-3 py-3 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                        checked={modalExtra}
+                        onChange={(e) => setModalExtra(e.target.checked)}
+                      />
+                      <span>
+                        <span className="font-medium text-slate-900">Qo&apos;shimcha ish</span>
+                        <span className="mt-0.5 block text-xs text-slate-500">
+                          Shu kun uchun qo&apos;shimcha {formatCurrency(MALE_EXTRA_WORK_PAY)}.
+                        </span>
+                      </span>
+                    </label>
+                    <p className="text-xs text-slate-500">
+                      1 stavka = {formatCurrency(editDailyRate)}. Shu kun:{' '}
+                      {formatCurrency(maleDayPay(editDailyRate, editStavka, modalExtra))}.
+                    </p>
+                  </>
+                ) : null}
                 {editNeedsShift && (
                   <Select
                     id="shift"
@@ -654,16 +803,18 @@ export function AttendanceForm({
                     options={shiftOptions}
                   />
                 )}
-                <Input
-                  id="hours"
-                  label="Ishlangan soatlar"
-                  type="number"
-                  min={0.5}
-                  max={24}
-                  step={0.5}
-                  value={modalHours}
-                  onChange={(e) => setModalHours(e.target.value)}
-                />
+                {editIsMale ? null : (
+                  <Input
+                    id="hours"
+                    label="Ishlangan soatlar"
+                    type="number"
+                    min={0.5}
+                    max={24}
+                    step={0.5}
+                    value={modalHours}
+                    onChange={(e) => setModalHours(e.target.value)}
+                  />
+                )}
               </>
             ) : (
               <div className="space-y-1">

@@ -3,8 +3,12 @@
 import { ActivityHeartbeat } from '@/components/layout/activity-heartbeat';
 import { AppHeader } from '@/components/layout/app-header';
 import { Sidebar } from '@/components/layout/sidebar';
+import { pingActivity } from '@/lib/actions/activity';
 import { UserRole } from '@/types/database';
 import { useState } from 'react';
+
+// Tabs opened before the heartbeat moved to /api/activity still call this action.
+void pingActivity;
 
 interface AppShellProps {
   userRole: UserRole;

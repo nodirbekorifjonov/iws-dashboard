@@ -6,7 +6,9 @@ import {
   PayrollRow,
   female12hDayHourly,
   female12hNightHourly,
+  formatStavka,
   isFemale12hWorker,
+  isMaleWorker,
   roundMoney,
 } from '@/types/database';
 import { calculatePayroll, updateAdvance } from '@/lib/actions/payroll';
@@ -120,7 +122,6 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
           )
         );
       }
-      router.refresh();
     } catch {
       alert('Avans saqlashda xatolik');
     } finally {
@@ -130,12 +131,25 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
 
   const totals = filteredRows
     ? {
-        hours: filteredRows.reduce((s, r) => s + r.totalHours, 0),
+        hours: filteredRows.reduce(
+          (s, r) => s + (isMaleWorker(r.worker) ? 0 : r.totalHours),
+          0
+        ),
+        stavka: roundMoney(filteredRows.reduce((s, r) => s + r.totalStavka, 0)),
         salary: filteredRows.reduce((s, r) => s + r.calculatedSalary, 0),
         advance: filteredRows.reduce((s, r) => s + r.advanceAmount, 0),
         remaining: filteredRows.reduce((s, r) => s + r.remainingAmount, 0),
       }
     : null;
+
+  const workedTotalLabel = totals
+    ? [
+        totals.hours > 0 ? `${totals.hours} soat` : '',
+        totals.stavka > 0 ? `${formatStavka(totals.stavka)} stavka` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ') || '0'
+    : '';
 
   return (
     <>
@@ -191,8 +205,8 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
                     <tr>
                       <th className="w-12">№</th>
                       <th>F.I.Sh</th>
-                      <th>Soatbay stavka</th>
-                      <th className="text-right">Ishlangan soat</th>
+                      <th>Stavka</th>
+                      <th className="text-right">Ishlangan</th>
                       <th className="text-right">Hisoblangan maosh</th>
                       <th className="text-right">Avans</th>
                       <th className="text-right">Qolgan summa</th>
@@ -225,12 +239,25 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
                                   /soat
                                 </div>
                               </div>
+                            ) : isMaleWorker(row.worker) ? (
+                              `${formatCurrency(row.worker.hourly_rate)}/kun`
                             ) : (
                               `${formatCurrency(row.worker.hourly_rate)}/soat`
                             )}
                           </td>
                           <td className="text-right font-medium text-slate-900">
-                            {row.totalHours} soat
+                            {isMaleWorker(row.worker) ? (
+                              <div>
+                                <div>{formatStavka(row.totalStavka)} stavka</div>
+                                {row.extraWorkPay > 0 ? (
+                                  <div className="text-xs font-normal text-slate-500">
+                                    Qo&apos;shimcha: {formatCurrency(row.extraWorkPay)}
+                                  </div>
+                                ) : null}
+                              </div>
+                            ) : (
+                              `${row.totalHours} soat`
+                            )}
                           </td>
                           <td className="text-right font-medium text-emerald-700">
                             {formatCurrency(row.calculatedSalary)}
@@ -279,7 +306,7 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
                           Jami
                         </td>
                         <td className="px-6 py-4 text-right text-slate-900">
-                          {totals.hours} soat
+                          {workedTotalLabel}
                         </td>
                         <td className="px-6 py-4 text-right text-emerald-700">
                           {formatCurrency(totals.salary)}

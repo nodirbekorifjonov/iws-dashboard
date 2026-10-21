@@ -7,7 +7,12 @@ import {
   ATTENDANCE_STATUS_LABELS,
   PayrollRow,
   Worker,
+  attendanceHasExtraWork,
+  formatStavka,
   isFemale12hWorker,
+  isMaleWorker,
+  MALE_EXTRA_WORK_PAY,
+  maleStavkaFromStored,
 } from '@/types/database';
 import { formatCurrency } from '@/lib/utils';
 import {
@@ -42,6 +47,7 @@ export function MyMonthView({ month, worker, attendance, payroll }: MyMonthViewP
   const workedDays = attendance.filter(
     (row) => row.status === 'present' || row.status === 'late'
   ).length;
+  const male = isMaleWorker(worker);
 
   function changeMonth(step: number) {
     const [year, mon] = month.split('-').map(Number);
@@ -96,8 +102,8 @@ export function MyMonthView({ month, worker, attendance, payroll }: MyMonthViewP
         />
         <SummaryCard
           icon={Clock}
-          label="Jami soat"
-          value={String(payroll.totalHours)}
+          label={male ? 'Jami stavka' : 'Jami soat'}
+          value={male ? formatStavka(payroll.totalStavka) : String(payroll.totalHours)}
           color="text-sky-600 bg-sky-50"
         />
         <SummaryCard
@@ -138,6 +144,7 @@ export function MyMonthView({ month, worker, attendance, payroll }: MyMonthViewP
                   record={record}
                   future={future}
                   showShift={isFemale12hWorker(worker)}
+                  male={male}
                 />
               );
             })}
@@ -179,11 +186,13 @@ function DayCell({
   record,
   future,
   showShift,
+  male,
 }: {
   day: number;
   record: Attendance | undefined;
   future: boolean;
   showShift: boolean;
+  male: boolean;
 }) {
   let classes = 'min-h-[4.5rem] rounded-lg border px-1 py-1.5 text-left';
   let statusLabel = '';
@@ -200,7 +209,12 @@ function DayCell({
         ? ' border-yellow-200 bg-yellow-50 text-yellow-900'
         : ' border-green-200 bg-green-50 text-green-900';
     statusLabel = ATTENDANCE_STATUS_LABELS[record.status];
-    detail = `${record.hours_worked} soat`;
+    detail = male
+      ? `${formatStavka(maleStavkaFromStored(record.hours_worked))} stavka`
+      : `${record.hours_worked} soat`;
+    if (male && attendanceHasExtraWork(record.notes)) {
+      detail += ` · +${formatCurrency(MALE_EXTRA_WORK_PAY)}`;
+    }
     if (showShift && record.shift) {
       detail += ` · ${ATTENDANCE_SHIFT_LABELS[record.shift]}`;
     }
