@@ -48,7 +48,7 @@ export function LoginForm({ initialError = '' }: { initialError?: string }) {
             <p className="mt-1 text-sm text-slate-500">Shirinlik zavodi boshqaruv tizimi</p>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-8">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-8">
             <h2 className="text-lg font-semibold text-slate-900">Tizimga kirish</h2>
             <p className="mt-1 mb-6 text-sm text-slate-500">
               Xodim yoki ishchi sifatida davom eting
@@ -141,7 +141,7 @@ export function LoginForm({ initialError = '' }: { initialError?: string }) {
               {mode === 'worker' ? (
                 <p className="text-xs text-slate-500">
                   Parol = kod + ism, bo‘sh joysiz. Masalan:{' '}
-                  <span className="font-mono">IWS-0001AkbarovaDilbar</span>
+                  <span className="break-all font-mono">IWS-0001AkbarovaDilbar</span>
                 </p>
               ) : null}
 

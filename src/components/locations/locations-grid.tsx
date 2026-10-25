@@ -83,19 +83,19 @@ export function LocationsGrid({ initialLocations }: LocationsGridProps) {
           {initialLocations.map((location) => (
             <Card key={location.id}>
               <CardContent className="pt-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-lg bg-indigo-50 p-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="shrink-0 rounded-lg bg-indigo-50 p-2">
                       <MapPin className="h-5 w-5 text-indigo-600" />
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-slate-900">{location.name}</h3>
+                    <div className="min-w-0">
+                      <h3 className="break-words font-semibold text-slate-900">{location.name}</h3>
                       {location.description && (
-                        <p className="mt-1 text-sm text-slate-500">{location.description}</p>
+                        <p className="mt-1 break-words text-sm text-slate-500">{location.description}</p>
                       )}
                     </div>
                   </div>
-                  <Badge variant={location.is_active ? 'success' : 'neutral'}>
+                  <Badge className="shrink-0" variant={location.is_active ? 'success' : 'neutral'}>
                     {location.is_active ? 'Faol' : 'Nofaol'}
                   </Badge>
                 </div>

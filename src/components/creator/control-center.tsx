@@ -149,8 +149,39 @@ export function ControlCenter({ data }: { data: ControlCenterData }) {
       ) : null}
 
       {tab === 'logins' ? (
-        <Card>
+        <>
+        <div className="space-y-3 md:hidden">
+          {data.logins.map((row) => (
+            <Card key={`${row.kind}-${row.id}`}>
+              <CardContent className="space-y-2 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="break-words font-medium text-slate-900">{row.fullName}</p>
+                    {row.loginCode ? (
+                      <p className="mt-1 break-all font-mono text-xs text-slate-500">
+                        {row.loginCode}
+                      </p>
+                    ) : null}
+                    <p className="mt-1 text-sm text-slate-600">{row.role}</p>
+                  </div>
+                  {row.isOnline ? (
+                    <Badge variant="success">Onlayn</Badge>
+                  ) : row.hasLoggedIn ? (
+                    <Badge variant="neutral">Kirgan</Badge>
+                  ) : (
+                    <Badge variant="warning">Kirmagan</Badge>
+                  )}
+                </div>
+                <p className="break-words text-sm text-slate-600">
+                  <ClientTime date={row.lastLoggedInAt} />
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <Card className="hidden md:block">
           <CardContent className="p-0">
+            <div className="overflow-x-auto">
             <table className="data-table">
               <thead>
                 <tr>
@@ -186,8 +217,10 @@ export function ControlCenter({ data }: { data: ControlCenterData }) {
                 ))}
               </tbody>
             </table>
+            </div>
           </CardContent>
         </Card>
+        </>
       ) : null}
 
       {tab === 'audit' ? (
@@ -249,7 +282,7 @@ export function ControlCenter({ data }: { data: ControlCenterData }) {
             data.alerts.map((alert) => (
               <Card key={alert.id}>
                 <CardContent className="flex items-start justify-between gap-3 p-4">
-                  <div>
+                  <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="info">{alert.section}</Badge>
                       <p className="font-medium text-slate-900">{alert.title}</p>
@@ -267,7 +300,10 @@ export function ControlCenter({ data }: { data: ControlCenterData }) {
                       ) : null}
                     </div>
                   </div>
-                  <Badge variant={alert.severity === 'danger' ? 'danger' : 'warning'}>
+                  <Badge
+                    className="shrink-0"
+                    variant={alert.severity === 'danger' ? 'danger' : 'warning'}
+                  >
                     {alert.severity === 'danger' ? 'Muhim' : 'Diqqat'}
                   </Badge>
                 </CardContent>
@@ -281,8 +317,32 @@ export function ControlCenter({ data }: { data: ControlCenterData }) {
         <div className="space-y-6">
           <div>
             <h2 className="mb-3 text-lg font-semibold text-slate-900">Ishchi portali</h2>
-            <Card>
+            <div className="space-y-3 md:hidden">
+              {data.workers.map((worker) => (
+                <Card key={worker.id}>
+                  <CardContent className="space-y-3 p-4">
+                    <div className="min-w-0">
+                      <p className="break-words font-medium text-slate-900">{worker.fullName}</p>
+                      <p className="mt-1 break-all font-mono text-sm text-slate-600">
+                        {worker.loginCode || '—'}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      className="w-full"
+                      variant={worker.loginEnabled ? 'secondary' : 'primary'}
+                      disabled={busy === worker.id || !worker.hasLogin}
+                      onClick={() => toggleWorker(worker.id, !worker.loginEnabled)}
+                    >
+                      {worker.loginEnabled ? 'O‘chirish' : 'Yoqish'}
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <Card className="hidden md:block">
               <CardContent className="p-0">
+                <div className="overflow-x-auto">
                 <table className="data-table">
                   <thead>
                     <tr>
@@ -312,14 +372,41 @@ export function ControlCenter({ data }: { data: ControlCenterData }) {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </CardContent>
             </Card>
           </div>
 
           <div>
             <h2 className="mb-3 text-lg font-semibold text-slate-900">Xodim kirishi</h2>
-            <Card>
+            <div className="space-y-3 md:hidden">
+              {data.staff.map((user) => (
+                <Card key={user.id}>
+                  <CardContent className="space-y-3 p-4">
+                    <div className="min-w-0">
+                      <p className="break-words font-medium text-slate-900">{user.fullName}</p>
+                      <p className="mt-1 text-sm text-slate-600">{user.roleLabel}</p>
+                    </div>
+                    {user.isCreator ? (
+                      <p className="text-xs text-slate-400">—</p>
+                    ) : (
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        variant={user.accessDisabled ? 'primary' : 'secondary'}
+                        disabled={busy === user.id}
+                        onClick={() => toggleStaff(user.id, !user.accessDisabled)}
+                      >
+                        {user.accessDisabled ? 'Ochish' : 'Yopish'}
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <Card className="hidden md:block">
               <CardContent className="p-0">
+                <div className="overflow-x-auto">
                 <table className="data-table">
                   <thead>
                     <tr>
@@ -351,6 +438,7 @@ export function ControlCenter({ data }: { data: ControlCenterData }) {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -366,7 +454,7 @@ export function ControlCenter({ data }: { data: ControlCenterData }) {
                     {data.neverLoggedIn.map((row) => (
                       <li key={row.id}>
                         {row.fullName}{' '}
-                        <span className="font-mono text-slate-500">{row.loginCode}</span>
+                        <span className="break-all font-mono text-slate-500">{row.loginCode}</span>
                       </li>
                     ))}
                   </ul>

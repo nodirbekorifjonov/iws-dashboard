@@ -46,10 +46,11 @@ export default async function WorkerLayout({
           >
             <button
               type="submit"
-              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              aria-label="Chiqish"
+              className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
             >
               <LogOut className="h-4 w-4" />
-              Chiqish
+              <span className="hidden sm:inline">Chiqish</span>
             </button>
           </form>
         </div>

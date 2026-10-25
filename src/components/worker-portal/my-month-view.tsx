@@ -23,6 +23,7 @@ import {
 } from '@/lib/utils/payroll';
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, Wallet } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import type { ReactNode } from 'react';
 
 const WEEKDAYS = ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'];
 
@@ -115,7 +116,14 @@ export function MyMonthView({ month, worker, attendance, payroll }: MyMonthViewP
         <SummaryCard
           icon={Wallet}
           label="Avans / qoldiq"
-          value={`${formatCurrency(payroll.advanceAmount)} / ${formatCurrency(payroll.remainingAmount)}`}
+          value={
+            <>
+              <span className="block">{formatCurrency(payroll.advanceAmount)}</span>
+              <span className="block text-base font-medium text-slate-700">
+                {formatCurrency(payroll.remainingAmount)}
+              </span>
+            </>
+          }
           color="text-slate-600 bg-slate-100"
         />
       </div>
@@ -124,7 +132,7 @@ export function MyMonthView({ month, worker, attendance, payroll }: MyMonthViewP
         <CardContent className="pt-5">
           <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-slate-500">
             {WEEKDAYS.map((day) => (
-              <div key={day} className="py-1">
+              <div key={day} className="min-w-0 py-1">
                 {day}
               </div>
             ))}
@@ -163,7 +171,7 @@ function SummaryCard({
 }: {
   icon: typeof CalendarDays;
   label: string;
-  value: string;
+  value: ReactNode;
   color: string;
 }) {
   return (
@@ -174,7 +182,7 @@ function SummaryCard({
         </div>
         <div className="min-w-0">
           <p className="text-xs text-slate-500">{label}</p>
-          <p className="truncate text-lg font-semibold text-slate-900">{value}</p>
+          <p className="break-words text-lg font-semibold text-slate-900">{value}</p>
         </div>
       </CardContent>
     </Card>
@@ -194,8 +202,10 @@ function DayCell({
   showShift: boolean;
   male: boolean;
 }) {
-  let classes = 'min-h-[4.5rem] rounded-lg border px-1 py-1.5 text-left';
+  let classes =
+    'min-h-16 min-w-0 overflow-hidden break-words rounded-lg border px-0.5 py-1.5 text-left sm:min-h-[4.5rem] sm:px-1';
   let statusLabel = '';
+  let shortLabel = '';
   let detail = '';
 
   if (future) {
@@ -203,12 +213,14 @@ function DayCell({
   } else if (!record) {
     classes += ' border-slate-200 bg-white text-slate-400';
     statusLabel = '—';
+    shortLabel = '—';
   } else if (record.status === 'present' || record.status === 'late') {
     classes +=
       record.status === 'late'
         ? ' border-yellow-200 bg-yellow-50 text-yellow-900'
         : ' border-green-200 bg-green-50 text-green-900';
     statusLabel = ATTENDANCE_STATUS_LABELS[record.status];
+    shortLabel = record.status === 'late' ? 'Kech' : 'Keldi';
     detail = male
       ? `${formatStavka(maleStavkaFromStored(record.hours_worked))} stavka`
       : `${record.hours_worked} soat`;
@@ -221,17 +233,28 @@ function DayCell({
   } else {
     classes += ' border-red-200 bg-red-50 text-red-900';
     statusLabel = ATTENDANCE_STATUS_LABELS[record.status];
+    shortLabel =
+      record.status === 'absent'
+        ? 'Yo‘q'
+        : record.status === 'holiday'
+          ? 'Ta’til'
+          : 'Kas.';
     detail = getAbsenceReason(record.status, record.notes);
   }
 
   return (
     <div className={classes}>
       <div className="text-xs font-semibold">{day}</div>
+      {shortLabel ? (
+        <div className="mt-0.5 text-[10px] leading-tight sm:hidden">{shortLabel}</div>
+      ) : null}
       {statusLabel ? (
-        <div className="mt-0.5 text-[10px] leading-tight">{statusLabel}</div>
+        <div className="mt-0.5 hidden text-[10px] leading-tight sm:block">{statusLabel}</div>
       ) : null}
       {detail ? (
-        <div className="mt-0.5 line-clamp-2 text-[10px] leading-tight opacity-80">{detail}</div>
+        <div className="mt-0.5 hidden break-words text-[10px] leading-tight opacity-80 sm:line-clamp-2">
+          {detail}
+        </div>
       ) : null}
     </div>
   );

@@ -126,3 +126,10 @@ body {
 .data-table td {
   padding: 1rem 1.5rem;
 }
+
+@media (max-width: 639px) {
+  .data-table th,
+  .data-table td {
+    padding: 0.625rem 0.75rem;
+  }
+}

@@ -296,11 +296,12 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
   return (
     <>
       {missingLoginCodes ? (
-        <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+        <div className="mb-4 break-words rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
           Ishchi kodlari uchun Supabase SQL Editor’da{' '}
           <code className="rounded bg-white/70 px-1">008_worker_portal.sql</code> ni
           ishga tushiring yoki <code className="rounded bg-white/70 px-1">npm run migrate</code>.
-          Parol = kod + ism, bo‘sh joysiz (masalan IWS-0001AkbarovaDilbar).
+          Parol = kod + ism, bo‘sh joysiz (masalan{' '}
+          <span className="break-all">IWS-0001AkbarovaDilbar</span>).
         </div>
       ) : null}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -355,6 +356,18 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
                     </p>
                     <p className="mt-1 text-sm text-slate-600">
                       {worker.position || 'Lavozim yo‘q'}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {worker.gender ? WORKER_GENDER_LABELS[worker.gender] : 'Jins ko‘rsatilmagan'}
+                      {worker.gender === 'female' && worker.shift_length
+                        ? ` · ${SHIFT_LENGTH_LABELS[worker.shift_length]}`
+                        : ''}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {worker.phone || 'Telefon yo‘q'}
+                    </p>
+                    <p className="mt-1 break-words text-sm text-slate-700">
+                      <WorkerRateText worker={worker} />
                     </p>
                   </div>
                   <Badge variant={worker.is_active ? 'success' : 'neutral'}>
@@ -421,20 +434,7 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
                         {formatDate(worker.start_date)}
                       </td>
                       <td className="text-slate-600">
-                        {isFemale12hWorker(worker) ? (
-                          <div>
-                            <div>
-                              Kunduzgi: {formatCurrency(roundMoney(female12hDayHourly()))}/soat
-                            </div>
-                            <div>
-                              Kechki: {formatCurrency(roundMoney(female12hNightHourly()))}/soat
-                            </div>
-                          </div>
-                        ) : isMaleWorker(worker) ? (
-                          `${formatCurrency(maleDailyRate(worker.hourly_rate))}/kun`
-                        ) : (
-                          `${formatCurrency(worker.hourly_rate)}/soat`
-                        )}
+                        <WorkerRateText worker={worker} />
                       </td>
                       <td>
                         <Badge variant={worker.is_active ? 'success' : 'neutral'}>
@@ -469,7 +469,7 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
             ? `${confirmDialog.worker.full_name} uchun ${loginActionLabel(confirmDialog.worker).toLowerCase()}?`
             : `${missingLogins.length} ta ishchiga kirish yaratiladi. Parol = kod + ism, bo‘sh joysiz.`}
         </p>
-        <div className="mt-4 flex justify-end gap-3">
+        <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
           <Button
             type="button"
             variant="secondary"
@@ -625,7 +625,7 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
               </select>
             </div>
           )}
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:flex-wrap sm:justify-end">
             <Button
               type="button"
               variant="secondary"
@@ -641,4 +641,23 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
       </Modal>
     </>
   );
+}
+
+function WorkerRateText({ worker }: { worker: Worker }) {
+  if (isFemale12hWorker(worker)) {
+    return (
+      <span>
+        <span className="block">
+          Kunduzgi: {formatCurrency(roundMoney(female12hDayHourly()))}/soat
+        </span>
+        <span className="block">
+          Kechki: {formatCurrency(roundMoney(female12hNightHourly()))}/soat
+        </span>
+      </span>
+    );
+  }
+  if (isMaleWorker(worker)) {
+    return `${formatCurrency(maleDailyRate(worker.hourly_rate))}/kun`;
+  }
+  return `${formatCurrency(worker.hourly_rate)}/soat`;
 }

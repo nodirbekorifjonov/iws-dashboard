@@ -26,21 +26,52 @@ export default async function UsersPage() {
       />
 
       <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50 p-4">
-        <p className="text-sm text-indigo-900">
+        <p className="text-sm break-words text-indigo-900">
           Yangi foydalanuvchi yaratish uchun Supabase Dashboard → Authentication → Users
           bo&apos;limidan foydalanuvchi qo&apos;shing. Rol avtomatik{' '}
-          <code className="rounded bg-white/70 px-1">brigadier</code> bo&apos;ladi.
+          <code className="rounded bg-white/70 px-1 break-all">brigadier</code> bo&apos;ladi.
           Superadmin/admin qilish uchun SQL:{' '}
-          <code className="rounded bg-white/70 px-1">
+          <code className="rounded bg-white/70 px-1 break-all">
             UPDATE profiles SET role = &apos;superadmin&apos; WHERE id = &apos;...&apos;
           </code>
-          . Metadata da faqat <code className="rounded bg-white/70 px-1">full_name</code>{' '}
+          . Metadata da faqat <code className="rounded bg-white/70 px-1 break-all">full_name</code>{' '}
           ishlatiladi. Ishchi kirishi Ishchilar sahifasidan yaratiladi; parol = kod + ism
           (bo‘sh joysiz).
         </p>
       </div>
 
-      <Card>
+      <div className="space-y-3 md:hidden">
+        {users.length === 0 ? (
+          <Card>
+            <CardContent className="py-12">
+              <EmptyState title="Foydalanuvchilar yo‘q" />
+            </CardContent>
+          </Card>
+        ) : (
+          users.map((user) => (
+            <Card key={user.id}>
+              <CardContent className="space-y-2 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="min-w-0 break-words font-medium text-slate-900">
+                    {user.full_name}
+                  </p>
+                  <Badge className="shrink-0" variant={roleVariant(user.role)}>
+                    {visibleRoleLabel(user.role)}
+                  </Badge>
+                </div>
+                <p className="text-sm text-slate-600">
+                  {user.location?.name || 'Blok biriktirilmagan'}
+                </p>
+                <p className="text-sm text-slate-500">
+                  {new Date(user.created_at).toLocaleDateString('uz-UZ')}
+                </p>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+
+      <Card className="hidden md:block">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="data-table">

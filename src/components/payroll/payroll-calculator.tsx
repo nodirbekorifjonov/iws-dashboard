@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   PayrollRow,
+  Worker,
   female12hDayHourly,
   female12hNightHourly,
   formatStavka,
@@ -197,7 +198,110 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
               onClearFilters={clearFilters}
             />
           </div>
-          <Card>
+          <div className="space-y-3 md:hidden">
+            {filteredRows && filteredRows.length > 0 ? (
+              filteredRows.map((row) => (
+                <Card key={row.worker.id}>
+                  <CardContent className="space-y-3 p-4">
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-900">{row.worker.full_name}</p>
+                      {row.worker.position ? (
+                        <p className="text-sm text-slate-500">{row.worker.position}</p>
+                      ) : null}
+                    </div>
+                    <dl className="space-y-2 text-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <dt className="text-slate-500">Stavka</dt>
+                        <dd className="min-w-0 text-right text-slate-700">
+                          <WorkerRate worker={row.worker} />
+                        </dd>
+                      </div>
+                      <div className="flex items-start justify-between gap-3">
+                        <dt className="text-slate-500">Ishlangan</dt>
+                        <dd className="text-right font-medium text-slate-900">
+                          <WorkerWorked row={row} />
+                        </dd>
+                      </div>
+                      <div className="flex items-start justify-between gap-3">
+                        <dt className="text-slate-500">Hisoblangan maosh</dt>
+                        <dd className="font-medium text-emerald-700">
+                          {formatCurrency(row.calculatedSalary)}
+                        </dd>
+                      </div>
+                    </dl>
+                    <div>
+                      <p className="mb-1.5 text-sm text-slate-500">Avans</p>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={0}
+                          value={advances[row.worker.id] ?? '0'}
+                          onChange={(e) =>
+                            setAdvances((prev) => ({
+                              ...prev,
+                              [row.worker.id]: e.target.value,
+                            }))
+                          }
+                          className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-right text-sm"
+                        />
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleSaveAdvance(row.worker.id)}
+                          disabled={savingAdvance === row.worker.id}
+                        >
+                          <Save className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex items-start justify-between gap-3 text-sm">
+                      <span className="text-slate-500">Qolgan summa</span>
+                      <span className="font-semibold text-indigo-700">
+                        {formatCurrency(row.remainingAmount)}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center text-sm text-slate-500">
+                  {rows.length === 0 ? "Faol ishchilar yo'q" : 'Ishchi topilmadi'}
+                </CardContent>
+              </Card>
+            )}
+            {totals && filteredRows && filteredRows.length > 0 ? (
+              <Card>
+                <CardContent className="space-y-2 p-4 text-sm">
+                  <p className="font-semibold text-slate-900">Jami</p>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-slate-500">Ishlangan</span>
+                    <span className="text-right font-medium text-slate-900">{workedTotalLabel}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-slate-500">Maosh</span>
+                    <span className="font-medium text-emerald-700">
+                      {formatCurrency(totals.salary)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-slate-500">Avans</span>
+                    <span className="font-medium text-slate-900">
+                      {formatCurrency(totals.advance)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-slate-500">Qoldiq</span>
+                    <span className="font-semibold text-indigo-700">
+                      {formatCurrency(totals.remaining)}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
+          </div>
+
+          <Card className="hidden md:block">
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <table className="data-table">
@@ -228,36 +332,10 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
                             )}
                           </td>
                           <td className="text-slate-600">
-                            {isFemale12hWorker(row.worker) ? (
-                              <div>
-                                <div>
-                                  Kunduzgi: {formatCurrency(roundMoney(female12hDayHourly()))}
-                                  /soat
-                                </div>
-                                <div>
-                                  Kechki: {formatCurrency(roundMoney(female12hNightHourly()))}
-                                  /soat
-                                </div>
-                              </div>
-                            ) : isMaleWorker(row.worker) ? (
-                              `${formatCurrency(row.worker.hourly_rate)}/kun`
-                            ) : (
-                              `${formatCurrency(row.worker.hourly_rate)}/soat`
-                            )}
+                            <WorkerRate worker={row.worker} />
                           </td>
                           <td className="text-right font-medium text-slate-900">
-                            {isMaleWorker(row.worker) ? (
-                              <div>
-                                <div>{formatStavka(row.totalStavka)} stavka</div>
-                                {row.extraWorkPay > 0 ? (
-                                  <div className="text-xs font-normal text-slate-500">
-                                    Qo&apos;shimcha: {formatCurrency(row.extraWorkPay)}
-                                  </div>
-                                ) : null}
-                              </div>
-                            ) : (
-                              `${row.totalHours} soat`
-                            )}
+                            <WorkerWorked row={row} />
                           </td>
                           <td className="text-right font-medium text-emerald-700">
                             {formatCurrency(row.calculatedSalary)}
@@ -340,4 +418,35 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
       )}
     </>
   );
+}
+
+function WorkerRate({ worker }: { worker: Worker }) {
+  if (isFemale12hWorker(worker)) {
+    return (
+      <div>
+        <div>Kunduzgi: {formatCurrency(roundMoney(female12hDayHourly()))}/soat</div>
+        <div>Kechki: {formatCurrency(roundMoney(female12hNightHourly()))}/soat</div>
+      </div>
+    );
+  }
+  if (isMaleWorker(worker)) {
+    return `${formatCurrency(worker.hourly_rate)}/kun`;
+  }
+  return `${formatCurrency(worker.hourly_rate)}/soat`;
+}
+
+function WorkerWorked({ row }: { row: PayrollRow }) {
+  if (isMaleWorker(row.worker)) {
+    return (
+      <div>
+        <div>{formatStavka(row.totalStavka)} stavka</div>
+        {row.extraWorkPay > 0 ? (
+          <div className="text-xs font-normal text-slate-500">
+            Qo&apos;shimcha: {formatCurrency(row.extraWorkPay)}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+  return `${row.totalHours} soat`;
 }

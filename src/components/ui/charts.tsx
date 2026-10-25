@@ -167,7 +167,9 @@ export function ColumnChart({
                     }}
                   />
                 </div>
-                <span className="text-xs text-slate-500">{item.label}</span>
+                <span className="line-clamp-2 break-words text-center text-xs text-slate-500">
+                  {item.label}
+                </span>
               </div>
             );
           })}

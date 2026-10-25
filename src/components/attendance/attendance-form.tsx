@@ -66,8 +66,24 @@ interface AttendanceFormProps {
   attendance: Attendance[];
 }
 
+const WEEKDAYS = ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'];
+
 function cellKey(workerId: string, date: string) {
   return `${workerId}:${date}`;
+}
+
+function firstWeekdayOffset(month: string): number {
+  const [year, mon] = month.split('-').map(Number);
+  const weekday = new Date(year, mon - 1, 1).getDay();
+  return (weekday + 6) % 7;
+}
+
+function shortMobileStatus(status: AttendanceStatus) {
+  if (status === 'present') return 'Keldi';
+  if (status === 'late') return 'Kech';
+  if (status === 'absent') return 'Yo‘q';
+  if (status === 'holiday') return 'Ta’til';
+  return 'Kas.';
 }
 
 function presentCellLabel(
@@ -201,6 +217,11 @@ export function AttendanceForm({
     hasActiveFilters,
     clearFilters,
   } = useWorkerSearchFilter(workers);
+  const [mobileWorkerId, setMobileWorkerId] = useState<string | null>(null);
+  const mobileWorker =
+    filteredWorkers.find((worker) => worker.id === mobileWorkerId) ??
+    filteredWorkers[0] ??
+    null;
 
   const daysInMonth = getDaysInMonth(month);
   const dates = getMonthDates(month);
@@ -401,9 +422,9 @@ export function AttendanceForm({
     <>
       {selectedCell && selectedCellData && !isEditing && (
         <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50 p-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="font-semibold text-indigo-950">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="break-words font-semibold text-indigo-950">
                 {selectedCell.workerName} —{' '}
                 {new Date(selectedCell.date + 'T00:00:00').toLocaleDateString('uz-UZ', {
                   day: 'numeric',
@@ -531,7 +552,24 @@ export function AttendanceForm({
         </div>
       </div>
 
-      <Card>
+      <AttendanceMobileMonth
+        month={month}
+        dates={dates}
+        workers={filteredWorkers}
+        worker={mobileWorker}
+        onWorkerChange={setMobileWorkerId}
+        isEditing={isEditing}
+        selectedCell={selectedCell}
+        getCell={getCell}
+        emptyLabel={
+          workers.length === 0 ? "Faol ishchilar yo'q" : 'Ishchi topilmadi'
+        }
+        onDayClick={(workerId, date, workerName) =>
+          handleCellClick(workerId, date, workerName)
+        }
+      />
+
+      <Card className="hidden md:block">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -834,14 +872,19 @@ export function AttendanceForm({
                 </select>
               </div>
             )}
-            <div className="flex justify-end gap-3">
-              <Button variant="secondary" onClick={() => setEditModal(null)}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+              <Button
+                variant="secondary"
+                className="w-full sm:w-auto"
+                onClick={() => setEditModal(null)}
+              >
                 Bekor qilish
               </Button>
               {editModal.mode === 'present' ? (
                 <>
                   <Button
                     variant="danger"
+                    className="w-full sm:w-auto"
                     onClick={() =>
                       setEditModal((prev) => (prev ? { ...prev, mode: 'absent' } : null))
                     }
@@ -849,7 +892,7 @@ export function AttendanceForm({
                     <X className="mr-2 h-4 w-4" />
                     Ishlamadi
                   </Button>
-                  <Button onClick={handleMarkPresent}>
+                  <Button className="w-full sm:w-auto" onClick={handleMarkPresent}>
                     <Check className="mr-2 h-4 w-4" />
                     Saqlash
                   </Button>
@@ -858,13 +901,18 @@ export function AttendanceForm({
                 <>
                   <Button
                     variant="secondary"
+                    className="w-full sm:w-auto"
                     onClick={() =>
                       setEditModal((prev) => (prev ? { ...prev, mode: 'present' } : null))
                     }
                   >
                     Orqaga
                   </Button>
-                  <Button onClick={handleMarkAbsent} variant="danger">
+                  <Button
+                    onClick={handleMarkAbsent}
+                    variant="danger"
+                    className="w-full sm:w-auto"
+                  >
                     <X className="mr-2 h-4 w-4" />
                     Saqlash
                   </Button>
@@ -875,5 +923,171 @@ export function AttendanceForm({
         </Modal>
       )}
     </>
+  );
+}
+
+function AttendanceMobileMonth({
+  month,
+  dates,
+  workers,
+  worker,
+  onWorkerChange,
+  isEditing,
+  selectedCell,
+  getCell,
+  emptyLabel,
+  onDayClick,
+}: {
+  month: string;
+  dates: string[];
+  workers: Worker[];
+  worker: Worker | null;
+  onWorkerChange: (workerId: string) => void;
+  isEditing: boolean;
+  selectedCell: { workerId: string; date: string } | null;
+  getCell: (workerId: string, date: string) => CellData | undefined;
+  emptyLabel: string;
+  onDayClick: (workerId: string, date: string, workerName: string) => void;
+}) {
+  const offset = firstWeekdayOffset(month);
+
+  if (!worker) {
+    return (
+      <Card className="md:hidden">
+        <CardContent className="py-12 text-center text-sm text-slate-500">
+          {emptyLabel}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="mb-4 space-y-3 md:hidden">
+      <Select
+        id="attendance-mobile-worker"
+        label="Ishchi"
+        value={worker.id}
+        onChange={(event) => onWorkerChange(event.target.value)}
+        options={workers.map((item) => ({
+          value: item.id,
+          label: item.full_name,
+        }))}
+      />
+      <Card>
+        <CardContent className="px-3 pt-4">
+          <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-medium text-slate-500">
+            {WEEKDAYS.map((day) => (
+              <div key={day} className="min-w-0 py-1">
+                {day}
+              </div>
+            ))}
+          </div>
+          <div className="mt-1 grid grid-cols-7 gap-1">
+            {Array.from({ length: offset }).map((_, index) => (
+              <div key={`pad-${index}`} />
+            ))}
+            {dates.map((date) => (
+              <MobileDayCell
+                key={date}
+                date={date}
+                worker={worker}
+                cell={getCell(worker.id, date)}
+                future={isFutureDate(date)}
+                isEditing={isEditing}
+                selected={
+                  selectedCell?.workerId === worker.id && selectedCell.date === date
+                }
+                onDayClick={onDayClick}
+              />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function MobileDayCell({
+  date,
+  worker,
+  cell,
+  future,
+  isEditing,
+  selected,
+  onDayClick,
+}: {
+  date: string;
+  worker: Worker;
+  cell: CellData | undefined;
+  future: boolean;
+  isEditing: boolean;
+  selected: boolean;
+  onDayClick: (workerId: string, date: string, workerName: string) => void;
+}) {
+  const day = Number(date.slice(-2));
+  const interactive = !future && (isEditing || Boolean(cell));
+  let classes =
+    'flex min-h-16 w-full min-w-0 flex-col overflow-hidden break-words rounded-lg border px-0.5 py-1 text-left';
+
+  if (future) {
+    classes += ' border-slate-100 bg-slate-50 text-slate-300';
+  } else if (!cell) {
+    classes += ' border-slate-200 bg-white text-slate-400';
+  } else if (cell.status === 'late') {
+    classes += ' border-yellow-200 bg-yellow-50 text-yellow-900';
+  } else if (cell.status === 'present' && cell.shift === 'night') {
+    classes += ' border-indigo-200 bg-indigo-50 text-indigo-900';
+  } else if (cell.status === 'present') {
+    classes += ' border-green-200 bg-green-50 text-green-900';
+  } else if (cell.status === 'absent') {
+    classes += ' border-red-200 bg-red-50 text-red-900';
+  } else {
+    classes += ' border-slate-200 bg-slate-50 text-slate-600';
+  }
+
+  if (selected) classes += ' ring-2 ring-inset ring-indigo-400';
+
+  const detail = cell
+    ? isPaidStatus(cell.status)
+      ? presentCellLabel(
+          worker,
+          cell.hoursWorked,
+          cell.shift,
+          isFemale12hWorker(worker),
+          cell.notes
+        )
+      : cell.status === 'absent'
+        ? getAbsenceReason(cell.status, cell.notes)
+        : ''
+    : '';
+
+  const body = (
+    <>
+      <div className="text-xs font-semibold">{day}</div>
+      {!future ? (
+        <div className="mt-0.5 text-[10px] leading-tight">
+          {cell ? shortMobileStatus(cell.status) : '—'}
+        </div>
+      ) : null}
+      {detail ? (
+        <div className="mt-0.5 line-clamp-2 text-[10px] leading-tight opacity-80">
+          {detail}
+        </div>
+      ) : null}
+    </>
+  );
+
+  if (!interactive) {
+    return <div className={classes}>{body}</div>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onDayClick(worker.id, date, worker.full_name)}
+      className={classes}
+    >
+      {body}
+    </button>
   );
 }

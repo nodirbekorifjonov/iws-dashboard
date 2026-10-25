@@ -28,7 +28,7 @@ export function AppShell({ userRole, userName, children }: AppShellProps) {
         mobileOpen={mobileOpen}
         onMobileOpenChange={setMobileOpen}
       />
-      <div className="lg:pl-60">
+      <div className="min-w-0 lg:pl-60">
         <AppHeader
           userName={userName}
           userRole={userRole}
