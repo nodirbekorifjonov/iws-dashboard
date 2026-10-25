@@ -14,12 +14,13 @@ export class SupabaseAttendanceRepository implements AttendanceRepository {
     const supabase = await createSupabaseServerClient();
     const { startDate, endDate } = getMonthDateRange(month);
 
-    const { data: workers, error: workersError } = await supabase
-      .from('workers')
-      .select('*')
-      .order('full_name');
-
-    if (workersError) throw workersError;
+    const workers = await fetchAllPages<AttendanceByMonthResult['workers'][number]>((from, to) =>
+      supabase
+        .from('workers')
+        .select('*')
+        .order('id', { ascending: true })
+        .range(from, to)
+    );
 
     const attendance = await fetchAllPages<Attendance>((from, to) =>
       supabase
@@ -32,11 +33,14 @@ export class SupabaseAttendanceRepository implements AttendanceRepository {
         .range(from, to)
     );
 
+    const attendanceIds = new Set(attendance.map((row) => row.worker_id));
+    const visibleWorkers = workersVisibleForMonth(
+      workers.filter((worker) => !worker.deleted_at || attendanceIds.has(worker.id)),
+      attendanceIds
+    ).sort((a, b) => a.full_name.localeCompare(b.full_name, 'uz'));
+
     return {
-      workers: workersVisibleForMonth(
-        workers || [],
-        attendance.map((row) => row.worker_id)
-      ),
+      workers: visibleWorkers,
       attendance,
     };
   }
@@ -62,19 +66,7 @@ export class SupabaseAttendanceRepository implements AttendanceRepository {
         .from('attendance')
         .upsert(chunk, { onConflict: 'worker_id,date' });
 
-      if (!error) continue;
-
-      const text = `${error.code ?? ''} ${error.message ?? ''}`;
-      const missingShift =
-        error.code === 'PGRST204' ||
-        text.includes("Could not find the 'shift' column");
-      if (!missingShift) throw error;
-
-      const withoutShift = chunk.map(({ shift: _shift, ...rest }) => rest);
-      const retry = await supabase
-        .from('attendance')
-        .upsert(withoutShift, { onConflict: 'worker_id,date' });
-      if (retry.error) throw retry.error;
+      if (error) throw error;
     }
   }
 

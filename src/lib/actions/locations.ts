@@ -1,5 +1,6 @@
 'use server';
 
+import { currentAssignments } from '@/lib/api/brigade';
 import {
   assignWorkerToLocation as apiAssignWorker,
   createLocation as apiCreateLocation,
@@ -66,6 +67,11 @@ export async function deleteLocation(id: string) {
     summary: `${actor.full_name} blokni o‘chirdi`,
   });
   revalidatePath('/locations');
+}
+
+export async function getAssignmentsAsOf(date: string) {
+  await requireRole(ADMIN_ROLES);
+  return currentAssignments(date);
 }
 
 export async function assignWorkerToLocation(

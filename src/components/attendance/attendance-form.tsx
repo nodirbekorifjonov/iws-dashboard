@@ -18,9 +18,10 @@ import {
   isFemale12hWorker,
   isMaleStavka,
   isMaleWorker,
+  DEFAULT_PAY_RATES,
   MALE_EXTRA_WORK_NOTE,
-  MALE_EXTRA_WORK_PAY,
   MALE_STAVKA_OPTIONS,
+  PayRates,
   maleDailyRate,
   maleDayPay,
   maleStavkaFromStored,
@@ -51,7 +52,7 @@ import {
   Download,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 interface CellData {
   status: AttendanceStatus;
@@ -64,6 +65,10 @@ interface AttendanceFormProps {
   month: string;
   workers: Worker[];
   attendance: Attendance[];
+  rates?: PayRates;
+  scopeNote?: string | null;
+  readOnly?: boolean;
+  editableKeys?: string[] | null;
 }
 
 const WEEKDAYS = ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'];
@@ -146,7 +151,12 @@ export function AttendanceForm({
   month,
   workers,
   attendance,
+  rates = DEFAULT_PAY_RATES,
+  scopeNote = null,
+  readOnly = false,
+  editableKeys = null,
 }: AttendanceFormProps) {
+  const extraPay = rates.maleExtraWorkPay;
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -167,16 +177,9 @@ export function AttendanceForm({
   const [modalNotes, setModalNotes] = useState('Sababsiz kelmadi');
 
   const buildInitialCells = useCallback(() => {
-    const workerMap = new Map(workers.map((worker) => [worker.id, worker]));
     const map: Record<string, CellData> = {};
     attendance.forEach((a) => {
-      const worker = workerMap.get(a.worker_id);
-      const needsShift = worker ? isFemale12hWorker(worker) : false;
-      const paid = isPaidStatus(a.status);
-      const shift =
-        needsShift && paid && a.shift !== 'day' && a.shift !== 'night'
-          ? 'day'
-          : (a.shift ?? null);
+      const shift = a.shift === 'day' || a.shift === 'night' ? a.shift : null;
       map[cellKey(a.worker_id, a.date)] = {
         status: a.status,
         hoursWorked: a.hours_worked || 0,
@@ -185,7 +188,17 @@ export function AttendanceForm({
       };
     });
     return map;
-  }, [attendance, workers]);
+  }, [attendance]);
+
+  const editableKeySet = useMemo(
+    () => (editableKeys ? new Set(editableKeys) : null),
+    [editableKeys]
+  );
+
+  function canEditDay(workerId: string, date: string) {
+    if (!editableKeySet) return true;
+    return editableKeySet.has(cellKey(workerId, date));
+  }
 
   const [cells, setCells] = useState<Record<string, CellData>>(buildInitialCells);
   const isEditingRef = useRef(false);
@@ -243,7 +256,7 @@ export function AttendanceForm({
   }
 
   function handleCellClick(workerId: string, date: string, workerName: string) {
-    if (isFutureDate(date)) return;
+    if (isFutureDate(date) || !canEditDay(workerId, date)) return;
 
     if (isEditing) {
       const existing = getCell(workerId, date);
@@ -347,7 +360,8 @@ export function AttendanceForm({
 
     setSaving(true);
     try {
-      const records = Object.entries(cells).map(([key, data]) => {
+      const records = Object.entries(cells).flatMap(([key, data]) => {
+        if (editableKeySet && !editableKeySet.has(key)) return [];
         const [workerId, date] = key.split(':');
         const worker = workerById(workerId);
         const paid = data.status === 'present' || data.status === 'late';
@@ -355,14 +369,16 @@ export function AttendanceForm({
           worker && isMaleWorker(worker) && paid
             ? maleStavkaFromStored(data.hoursWorked)
             : data.hoursWorked;
-        return {
-          workerId,
-          date,
-          status: data.status,
-          hoursWorked,
-          shift: data.shift,
-          notes: data.notes || undefined,
-        };
+        return [
+          {
+            workerId,
+            date,
+            status: data.status,
+            hoursWorked,
+            shift: data.shift,
+            notes: data.notes || undefined,
+          },
+        ];
       });
       await saveAttendanceBatch(records);
       isEditingRef.current = false;
@@ -376,6 +392,7 @@ export function AttendanceForm({
   }
 
   function handleStartEdit() {
+    if (readOnly) return;
     setCells(buildInitialCells());
     setIsEditing(true);
     setSelectedCell(null);
@@ -390,7 +407,7 @@ export function AttendanceForm({
   async function handleExportExcel() {
     setExporting(true);
     try {
-      await exportAttendanceToExcel(workers, cells, month, dates);
+      await exportAttendanceToExcel(workers, cells, month, dates, rates);
     } catch {
       alert('Excel faylni yuklab olishda xatolik');
     } finally {
@@ -449,7 +466,7 @@ export function AttendanceForm({
                         <>
                           {' · '}
                           Qo&apos;shimcha ish:{' '}
-                          <strong>{formatCurrency(MALE_EXTRA_WORK_PAY)}</strong>
+                          <strong>{formatCurrency(extraPay)}</strong>
                         </>
                       ) : null}
                       {' · '}
@@ -459,7 +476,8 @@ export function AttendanceForm({
                           maleDayPay(
                             maleDailyRate(selectedWorker.hourly_rate),
                             maleStavkaFromStored(selectedCellData.hoursWorked),
-                            attendanceHasExtraWork(selectedCellData.notes)
+                            attendanceHasExtraWork(selectedCellData.notes),
+                            extraPay
                           )
                         )}
                       </strong>
@@ -533,7 +551,7 @@ export function AttendanceForm({
             <Download className="mr-2 h-4 w-4" />
             {exporting ? 'Yuklanmoqda...' : 'Excel'}
           </Button>
-          {isEditing ? (
+          {readOnly ? null : isEditing ? (
             <>
               <Button variant="secondary" onClick={handleCancelEdit} disabled={saving}>
                 Bekor qilish
@@ -562,11 +580,12 @@ export function AttendanceForm({
         selectedCell={selectedCell}
         getCell={getCell}
         emptyLabel={
-          workers.length === 0 ? "Faol ishchilar yo'q" : 'Ishchi topilmadi'
+          workers.length === 0 ? scopeNote || "Faol ishchilar yo'q" : 'Ishchi topilmadi'
         }
         onDayClick={(workerId, date, workerName) =>
           handleCellClick(workerId, date, workerName)
         }
+        canEditDay={canEditDay}
       />
 
       <Card className="hidden md:block">
@@ -611,7 +630,7 @@ export function AttendanceForm({
                       className="px-6 py-12 text-center text-slate-500"
                     >
                       {workers.length === 0
-                        ? 'Faol ishchilar yo\'q'
+                        ? scopeNote || 'Faol ishchilar yo\'q'
                         : 'Ishchi topilmadi'}
                     </td>
                   </tr>
@@ -622,7 +641,10 @@ export function AttendanceForm({
                         {index + 1}
                       </td>
                       <td className="sticky left-10 z-10 border-r border-slate-100 bg-white px-4 py-3 font-medium text-slate-900">
-                        <div className="max-w-[160px] truncate">{worker.full_name}</div>
+                        <div className="max-w-[160px] truncate">
+                          {worker.full_name}
+                          {worker.deleted_at ? ' (o‘chirilgan)' : ''}
+                        </div>
                         {isMaleWorker(worker) && (
                           <div className="text-xs text-indigo-600">Kunbay</div>
                         )}
@@ -637,7 +659,7 @@ export function AttendanceForm({
                       </td>
                       {dates.map((dateStr) => {
                         const cell = getCell(worker.id, dateStr);
-                        const future = isFutureDate(dateStr);
+                        const future = isFutureDate(dateStr) || !canEditDay(worker.id, dateStr);
                         const isSelected =
                           selectedCell?.workerId === worker.id &&
                           selectedCell?.date === dateStr;
@@ -739,7 +761,7 @@ export function AttendanceForm({
           <span className="inline-flex min-w-5 h-5 items-center justify-center rounded bg-green-50 px-0.5 text-[10px] font-medium text-green-700">
             1+
           </span>
-          Qo&apos;shimcha ish ({formatCurrency(MALE_EXTRA_WORK_PAY)})
+          Qo&apos;shimcha ish ({formatCurrency(extraPay)})
         </span>
         <span className="flex items-center gap-1">
           <span className="inline-flex min-w-5 h-5 items-center justify-center rounded bg-green-50 px-0.5 text-[10px] font-medium text-green-700">
@@ -818,13 +840,13 @@ export function AttendanceForm({
                       <span>
                         <span className="font-medium text-slate-900">Qo&apos;shimcha ish</span>
                         <span className="mt-0.5 block text-xs text-slate-500">
-                          Shu kun uchun qo&apos;shimcha {formatCurrency(MALE_EXTRA_WORK_PAY)}.
+                          Shu kun uchun qo&apos;shimcha {formatCurrency(extraPay)}.
                         </span>
                       </span>
                     </label>
                     <p className="text-xs text-slate-500">
                       1 stavka = {formatCurrency(editDailyRate)}. Shu kun:{' '}
-                      {formatCurrency(maleDayPay(editDailyRate, editStavka, modalExtra))}.
+                      {formatCurrency(maleDayPay(editDailyRate, editStavka, modalExtra, extraPay))}.
                     </p>
                   </>
                 ) : null}
@@ -937,6 +959,7 @@ function AttendanceMobileMonth({
   getCell,
   emptyLabel,
   onDayClick,
+  canEditDay,
 }: {
   month: string;
   dates: string[];
@@ -946,6 +969,7 @@ function AttendanceMobileMonth({
   isEditing: boolean;
   selectedCell: { workerId: string; date: string } | null;
   getCell: (workerId: string, date: string) => CellData | undefined;
+  canEditDay: (workerId: string, date: string) => boolean;
   emptyLabel: string;
   onDayClick: (workerId: string, date: string, workerName: string) => void;
 }) {
@@ -970,7 +994,7 @@ function AttendanceMobileMonth({
         onChange={(event) => onWorkerChange(event.target.value)}
         options={workers.map((item) => ({
           value: item.id,
-          label: item.full_name,
+          label: item.deleted_at ? `${item.full_name} (o‘chirilgan)` : item.full_name,
         }))}
       />
       <Card>
@@ -992,7 +1016,7 @@ function AttendanceMobileMonth({
                 date={date}
                 worker={worker}
                 cell={getCell(worker.id, date)}
-                future={isFutureDate(date)}
+                future={isFutureDate(date) || !canEditDay(worker.id, date)}
                 isEditing={isEditing}
                 selected={
                   selectedCell?.workerId === worker.id && selectedCell.date === date

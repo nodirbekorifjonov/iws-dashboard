@@ -16,7 +16,7 @@ export class SupabaseLocationsRepository implements LocationsRepository {
       .order('name');
 
     if (error) throw error;
-    return data;
+    return data ?? [];
   }
 
   async create(input: CreateLocationInput): Promise<void> {

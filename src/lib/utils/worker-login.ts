@@ -12,16 +12,8 @@ export function normalizeWorkerLoginCode(code: string): string {
   return code.trim().toUpperCase().replace(/\s+/g, '');
 }
 
-export function workerNameForPassword(fullName: string): string {
-  return normalizePasswordPunctuation(fullName).replace(/\s+/g, '');
-}
-
 export function normalizeWorkerPasswordInput(password: string): string {
   return normalizePasswordPunctuation(password).trim();
-}
-
-export function workerDefaultPassword(loginCode: string, fullName: string): string {
-  return `${normalizeWorkerLoginCode(loginCode)}${workerNameForPassword(fullName)}`;
 }
 
 export function workerLoginCodeToEmail(code: string): string {

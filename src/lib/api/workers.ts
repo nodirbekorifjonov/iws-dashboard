@@ -10,6 +10,10 @@ export async function getWorkers() {
   return getWorkersRepository().findAll();
 }
 
+export async function getWorkersIncludingDeleted() {
+  return getWorkersRepository().findAllIncludingDeleted();
+}
+
 export async function getWorkerById(id: string) {
   return getWorkersRepository().findById(id);
 }

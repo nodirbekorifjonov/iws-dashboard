@@ -4,7 +4,11 @@ import {
   setStaffAccessDisabled,
   setWorkerLoginEnabled,
 } from '@/lib/actions/control';
+import { lockMonth, restoreWorker } from '@/lib/actions/governance';
+import type { getCreatorSettings } from '@/lib/actions/governance';
 import type { ControlCenterData } from '@/lib/api/control';
+import { ControlSettings } from '@/components/creator/control-settings';
+import { exportAuditToExcel } from '@/lib/utils/excel';
 import { auditContext } from '@/lib/utils/audit-context';
 import Link from 'next/link';
 import { cn, formatCurrency, formatDateTime, formatRelativeTime } from '@/lib/utils';
@@ -17,7 +21,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-type Tab = 'overview' | 'logins' | 'audit' | 'alerts' | 'manage';
+type Tab = 'overview' | 'logins' | 'audit' | 'alerts' | 'manage' | 'settings';
+type Settings = Awaited<ReturnType<typeof getCreatorSettings>>;
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: 'Umumiy' },
@@ -25,6 +30,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'audit', label: 'Jurnal' },
   { id: 'alerts', label: 'Ogohlantirishlar' },
   { id: 'manage', label: 'Boshqaruv' },
+  { id: 'settings', label: 'Sozlamalar' },
 ];
 
 function ClientTime({ date }: { date: string | null }) {
@@ -37,10 +43,21 @@ function ClientTime({ date }: { date: string | null }) {
   return <span>{label ?? '—'}</span>;
 }
 
-export function ControlCenter({ data }: { data: ControlCenterData }) {
+export function ControlCenter({
+  data,
+  settings,
+}: {
+  data: ControlCenterData;
+  settings: Settings;
+}) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('overview');
   const [busy, setBusy] = useState<string | null>(null);
+  const [auditQuery, setAuditQuery] = useState('');
+  const [auditActor, setAuditActor] = useState('');
+  const [auditAction, setAuditAction] = useState('');
+  const [auditFrom, setAuditFrom] = useState('');
+  const [auditTo, setAuditTo] = useState('');
 
   useEffect(() => {
     const id = window.setInterval(() => router.refresh(), 20000);
@@ -51,6 +68,7 @@ export function ControlCenter({ data }: { data: ControlCenterData }) {
     setBusy(id);
     try {
       await setWorkerLoginEnabled(id, enabled);
+      router.refresh();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Xatolik');
     } finally {
@@ -58,10 +76,38 @@ export function ControlCenter({ data }: { data: ControlCenterData }) {
     }
   }
 
+  async function runAlert(alertId: string, task: () => Promise<void>) {
+    setBusy(alertId);
+    try {
+      await task();
+      router.refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Xatolik');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const auditActors = [...new Set(data.audit.map((event) => event.actor_name))].sort();
+  const auditActions = [...new Set(data.audit.map((event) => event.action))].sort();
+  const filteredAudit = data.audit.filter((event) => {
+    const query = auditQuery.trim().toLowerCase();
+    if (query && !`${event.summary} ${event.entity_name || ''}`.toLowerCase().includes(query)) {
+      return false;
+    }
+    if (auditActor && event.actor_name !== auditActor) return false;
+    if (auditAction && event.action !== auditAction) return false;
+    const day = event.created_at.slice(0, 10);
+    if (auditFrom && day < auditFrom) return false;
+    if (auditTo && day > auditTo) return false;
+    return true;
+  });
+
   async function toggleStaff(id: string, disabled: boolean) {
     setBusy(id);
     try {
       await setStaffAccessDisabled(id, disabled);
+      router.refresh();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Xatolik');
     } finally {
@@ -224,52 +270,137 @@ export function ControlCenter({ data }: { data: ControlCenterData }) {
       ) : null}
 
       {tab === 'audit' ? (
-        <Card>
-          <CardContent className="p-0">
-            {data.audit.length === 0 ? (
-              <EmptyState
-                title="Hali jurnal yozuvi yo‘q"
-                description="O‘zgarishlar shu yerda paydo bo‘ladi."
-              />
-            ) : (
-              <ul className="divide-y divide-slate-100">
-                {data.audit.map((event) => {
-                  const context = auditContext(
-                    event.action,
-                    event.metadata,
-                    event.entity_name
-                  );
-                  return (
-                    <li key={event.id} className="px-6 py-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="info">{context.section}</Badge>
-                        {event.entity_name &&
-                        !/^\d{4}-\d{2}$/.test(event.entity_name) ? (
-                          <span className="text-xs text-slate-500">
-                            {event.entity_name}
-                          </span>
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <input
+              value={auditQuery}
+              onChange={(event) => setAuditQuery(event.target.value)}
+              placeholder="Qidirish"
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            />
+            <select
+              value={auditActor}
+              onChange={(event) => setAuditActor(event.target.value)}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            >
+              <option value="">Barcha odamlar</option>
+              {auditActors.map((actor) => (
+                <option key={actor} value={actor}>
+                  {actor}
+                </option>
+              ))}
+            </select>
+            <select
+              value={auditAction}
+              onChange={(event) => setAuditAction(event.target.value)}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            >
+              <option value="">Barcha amallar</option>
+              {auditActions.map((action) => (
+                <option key={action} value={action}>
+                  {action}
+                </option>
+              ))}
+            </select>
+            <input
+              type="date"
+              value={auditFrom}
+              onChange={(event) => setAuditFrom(event.target.value)}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            />
+            <input
+              type="date"
+              value={auditTo}
+              onChange={(event) => setAuditTo(event.target.value)}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={filteredAudit.length === 0}
+              onClick={() =>
+                exportAuditToExcel(
+                  filteredAudit.map((event) => ({
+                    createdAt: formatDateTime(event.created_at),
+                    actor: event.actor_name,
+                    action: event.action,
+                    summary: event.summary,
+                  }))
+                )
+              }
+            >
+              Excel
+            </Button>
+          </div>
+          <Card>
+            <CardContent className="p-0">
+              {filteredAudit.length === 0 ? (
+                <EmptyState
+                  title="Jurnal yozuvi yo‘q"
+                  description="Filtrni o‘zgartiring yoki yangi o‘zgarish kuting."
+                />
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {filteredAudit.map((event) => {
+                    const context = auditContext(
+                      event.action,
+                      event.metadata,
+                      event.entity_name
+                    );
+                    const changes = Array.isArray(event.metadata?.changes)
+                      ? event.metadata.changes.slice(0, 8)
+                      : [];
+                    return (
+                      <li key={event.id} className="px-6 py-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="info">{context.section}</Badge>
+                          {event.entity_name &&
+                          !/^\d{4}-\d{2}$/.test(event.entity_name) ? (
+                            <span className="text-xs text-slate-500">
+                              {event.entity_name}
+                            </span>
+                          ) : null}
+                          {context.monthLabel ? (
+                            <span className="text-xs text-slate-500">
+                              {context.monthLabel}
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-1 text-sm text-slate-900">{event.summary}</p>
+                        {changes.length > 0 ? (
+                          <ul className="mt-2 space-y-1 text-xs text-slate-600">
+                            {changes.map((change, index) => {
+                              const row = change as {
+                                worker?: string;
+                                date?: string;
+                                from?: string;
+                                to?: string;
+                              };
+                              return (
+                                <li key={`${event.id}-${index}`}>
+                                  {row.worker} · {row.date}: {row.from} → {row.to}
+                                </li>
+                              );
+                            })}
+                          </ul>
                         ) : null}
-                        {context.monthLabel ? (
-                          <span className="text-xs text-slate-500">
-                            {context.monthLabel}
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="mt-1 text-sm text-slate-900">{event.summary}</p>
-                      <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                        <span>{event.actor_name}</span>
-                        <ClientTime date={event.created_at} />
-                        <Link href={context.href} className="text-indigo-600 hover:text-indigo-800">
-                          Ochish
-                        </Link>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+                        <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                          <span>{event.actor_name}</span>
+                          <ClientTime date={event.created_at} />
+                          <Link href={context.href} className="text-indigo-600 hover:text-indigo-800">
+                            Ochish
+                          </Link>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       ) : null}
 
       {tab === 'alerts' ? (
@@ -300,18 +431,43 @@ export function ControlCenter({ data }: { data: ControlCenterData }) {
                       ) : null}
                     </div>
                   </div>
-                  <Badge
-                    className="shrink-0"
-                    variant={alert.severity === 'danger' ? 'danger' : 'warning'}
-                  >
-                    {alert.severity === 'danger' ? 'Muhim' : 'Diqqat'}
-                  </Badge>
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <Badge variant={alert.severity === 'danger' ? 'danger' : 'warning'}>
+                      {alert.severity === 'danger' ? 'Muhim' : 'Diqqat'}
+                    </Badge>
+                    {alert.action ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy === alert.id}
+                        onClick={() =>
+                          runAlert(alert.id, async () => {
+                            const action = alert.action;
+                            if (!action) return;
+                            if (action.kind === 'disable-staff') {
+                              await setStaffAccessDisabled(action.targetId, true);
+                            } else if (action.kind === 'disable-worker') {
+                              await setWorkerLoginEnabled(action.targetId, false);
+                            } else if (action.kind === 'lock-month') {
+                              await lockMonth(action.targetId);
+                            } else {
+                              await restoreWorker(action.targetId);
+                            }
+                          })
+                        }
+                      >
+                        {alert.action.label}
+                      </Button>
+                    ) : null}
+                  </div>
                 </CardContent>
               </Card>
             ))
           )}
         </div>
       ) : null}
+
+      {tab === 'settings' ? <ControlSettings settings={settings} /> : null}
 
       {tab === 'manage' ? (
         <div className="space-y-6">

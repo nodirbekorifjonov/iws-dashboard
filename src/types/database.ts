@@ -28,25 +28,56 @@ export function roundMoney(amount: number): number {
   return Math.round(amount * 100) / 100;
 }
 
-export function female12hDayHourly(): number {
-  return FEMALE_12H_DAY_PAY / FEMALE_12H_HOURS;
+export interface PayRates {
+  maleDailyPay: number;
+  maleExtraWorkPay: number;
+  female8hHourly: number;
+  female12hDayPay: number;
+  female12hNightPay: number;
+  largeAdvanceLimit: number;
 }
 
-export function female12hNightHourly(): number {
-  return FEMALE_12H_NIGHT_PAY / FEMALE_12H_HOURS;
+export const DEFAULT_PAY_RATES: PayRates = {
+  maleDailyPay: MALE_DAILY_PAY,
+  maleExtraWorkPay: MALE_EXTRA_WORK_PAY,
+  female8hHourly: FEMALE_8H_HOURLY_RATE,
+  female12hDayPay: FEMALE_12H_DAY_PAY,
+  female12hNightPay: FEMALE_12H_NIGHT_PAY,
+  largeAdvanceLimit: 500_000,
+};
+
+export interface PayContext {
+  rates: PayRates;
+  standardMaleDaily: number[];
+  standardFemale8h: number[];
+}
+
+export const DEFAULT_PAY_CONTEXT: PayContext = {
+  rates: DEFAULT_PAY_RATES,
+  standardMaleDaily: [MALE_DAILY_PAY],
+  standardFemale8h: [FEMALE_8H_HOURLY_RATE],
+};
+
+export function female12hDayHourly(rates: PayRates = DEFAULT_PAY_RATES): number {
+  return rates.female12hDayPay / FEMALE_12H_HOURS;
+}
+
+export function female12hNightHourly(rates: PayRates = DEFAULT_PAY_RATES): number {
+  return rates.female12hNightPay / FEMALE_12H_HOURS;
 }
 
 export function defaultHourlyRate(
   gender: WorkerGender,
-  shiftLength?: ShiftLength | null
+  shiftLength?: ShiftLength | null,
+  rates: PayRates = DEFAULT_PAY_RATES
 ): number {
   if (gender === 'male') {
-    return MALE_DAILY_PAY;
+    return rates.maleDailyPay;
   }
   if (shiftLength === 12) {
-    return roundMoney(female12hDayHourly());
+    return roundMoney(female12hDayHourly(rates));
   }
-  return FEMALE_8H_HOURLY_RATE;
+  return rates.female8hHourly;
 }
 
 export function isMaleWorker(worker: Pick<Worker, 'gender'>): boolean {
@@ -94,9 +125,14 @@ export function attendanceHasExtraWork(notes: string | null | undefined): boolea
   return (notes ?? '').trim() === MALE_EXTRA_WORK_NOTE;
 }
 
-export function maleDayPay(dailyRate: number, stavka: number, extraWork = false): number {
+export function maleDayPay(
+  dailyRate: number,
+  stavka: number,
+  extraWork = false,
+  extraPay = MALE_EXTRA_WORK_PAY
+): number {
   return roundMoney(
-    (Number(dailyRate) || 0) * (Number(stavka) || 0) + (extraWork ? MALE_EXTRA_WORK_PAY : 0)
+    (Number(dailyRate) || 0) * (Number(stavka) || 0) + (extraWork ? extraPay : 0)
   );
 }
 
@@ -132,6 +168,7 @@ export interface Worker {
   user_id: string | null;
   is_active: boolean;
   login_enabled?: boolean;
+  deleted_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -157,6 +194,12 @@ export interface ActivityPing {
   last_seen_at: string;
 }
 
+export interface ControlAlertAction {
+  kind: 'disable-staff' | 'disable-worker' | 'lock-month' | 'restore-worker';
+  targetId: string;
+  label: string;
+}
+
 export interface ControlAlert {
   id: string;
   title: string;
@@ -165,6 +208,7 @@ export interface ControlAlert {
   severity: 'warning' | 'danger';
   section: string;
   href?: string;
+  action?: ControlAlertAction;
 }
 
 export interface ControlLoginRow {
@@ -194,10 +238,11 @@ export function defaultHoursForWorker(
 
 export function hourlyRateForAttendance(
   worker: Pick<Worker, 'gender' | 'shift_length' | 'hourly_rate'>,
-  shift: AttendanceShift | null | undefined
+  shift: AttendanceShift | null | undefined,
+  rates: PayRates = DEFAULT_PAY_RATES
 ): number {
   if (isFemale12hWorker(worker)) {
-    return shift === 'night' ? female12hNightHourly() : female12hDayHourly();
+    return shift === 'night' ? female12hNightHourly(rates) : female12hDayHourly(rates);
   }
   return Number(worker.hourly_rate) || 0;
 }

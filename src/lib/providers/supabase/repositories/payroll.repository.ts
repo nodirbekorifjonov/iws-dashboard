@@ -4,6 +4,7 @@ import {
   UpdateAdvanceInput,
 } from '@/lib/repositories/types';
 import { Advance, Attendance } from '@/types/database';
+import { getPayContext } from '@/lib/api/pay-rates';
 import { calculatePayroll, getMonthDateRange, workersVisibleForMonth } from '@/lib/utils/payroll';
 import { fetchAllPages } from '../fetch-all';
 import { createSupabaseServerClient } from '../server';
@@ -15,12 +16,14 @@ export class SupabasePayrollRepository implements PayrollRepository {
     const { startDate, endDate } = getMonthDateRange(monthPrefix);
     const monthDate = startDate;
 
-    const { data: workers, error: workersError } = await supabase
-      .from('workers')
-      .select('*')
-      .order('full_name');
-
-    if (workersError) throw workersError;
+    const workers = await fetchAllPages<PayrollCalculationResult['rows'][number]['worker']>(
+      (from, to) =>
+        supabase
+          .from('workers')
+          .select('*')
+          .order('id', { ascending: true })
+          .range(from, to)
+    );
 
     const attendance = await fetchAllPages<Attendance>((from, to) =>
       supabase
@@ -33,23 +36,28 @@ export class SupabasePayrollRepository implements PayrollRepository {
         .range(from, to)
     );
 
-    const { data: advances, error: advancesError } = await supabase
-      .from('advances')
-      .select('*')
-      .eq('month', monthDate);
-
-    if (advancesError) throw advancesError;
-
-    const visibleWorkers = workersVisibleForMonth(
-      workers || [],
-      (attendance || []).map((row) => row.worker_id)
+    const advances = await fetchAllPages<Advance>((from, to) =>
+      supabase
+        .from('advances')
+        .select('*')
+        .eq('month', monthDate)
+        .order('id', { ascending: true })
+        .range(from, to)
     );
+
+    const attendanceIds = new Set(attendance.map((row) => row.worker_id));
+    const visibleWorkers = workersVisibleForMonth(
+      workers.filter((worker) => !worker.deleted_at || attendanceIds.has(worker.id)),
+      attendanceIds
+    ).sort((a, b) => a.full_name.localeCompare(b.full_name, 'uz'));
+    const payContext = await getPayContext(monthPrefix);
 
     const rows = calculatePayroll(
       visibleWorkers,
-      attendance || [],
-      advances || [],
-      monthPrefix
+      attendance,
+      advances,
+      monthPrefix,
+      payContext
     );
 
     return { month: monthPrefix, rows };

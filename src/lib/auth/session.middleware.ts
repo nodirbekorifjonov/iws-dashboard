@@ -54,7 +54,7 @@ function homePathForRole(role: string | null) {
  * Kelajakda auth provider o'zgarganda faqat session provider o'zgaradi.
  */
 export async function handleSession(request: NextRequest) {
-  const { user, role, response, configError } = await handleSupabaseSession(request);
+  const { user, role, response, configError, blocked } = await handleSupabaseSession(request);
 
   if (configError) {
     if (request.nextUrl.pathname === '/login') {
@@ -80,7 +80,11 @@ export async function handleSession(request: NextRequest) {
   const isPublicRoute = isLoginPage;
 
   if (!user && !isPublicRoute) {
-    return redirectWithSession(request, response, '/login');
+    return redirectWithSession(
+      request,
+      response,
+      blocked ? '/login?error=blocked' : '/login'
+    );
   }
 
   if (user && isLoginPage) {

@@ -7,6 +7,7 @@ import {
   getWorkers as apiGetWorkers,
   updateWorker as apiUpdateWorker,
 } from '@/lib/api/workers';
+import { revokeUserSessions } from '@/lib/api/governance';
 import {
   createWorkerAuthLogin,
   deleteWorkerAuthUser,
@@ -185,7 +186,7 @@ export async function updateWorker(
 export async function deleteWorker(id: string) {
   const actor = await requireRole(ADMIN_ROLES);
   const worker = await apiGetWorkerById(id);
-  await apiDeleteWorker(id);
+  const softDeleted = await apiDeleteWorker(id);
   await recordAudit({
     actor,
     action: 'worker.delete',
@@ -195,7 +196,8 @@ export async function deleteWorker(id: string) {
     summary: `${actor.full_name} ${worker?.full_name || 'ishchi'}ni o‘chirdi`,
   });
   if (worker?.user_id) {
-    await deleteWorkerAuthUser(worker.user_id);
+    if (softDeleted) await revokeUserSessions(worker.user_id);
+    else await deleteWorkerAuthUser(worker.user_id);
   }
   revalidatePath('/workers');
   revalidatePath('/dashboard');
@@ -259,6 +261,7 @@ export async function provisionMissingWorkerLogins(): Promise<{
   created?: number;
   failed?: number;
   errors?: string[];
+  passwords?: { fullName: string; loginCode: string; password: string }[];
 }> {
   try {
     const actor = await requireRole(ADMIN_ROLES);

@@ -1,3 +1,4 @@
+import { listAuthUsers } from '@/lib/api/auth-users';
 import { createSupabaseAdminClient } from '@/lib/providers/supabase/admin';
 import { Profile, ProfileLogin, WorkerLoginStatus } from '@/types/database';
 
@@ -86,18 +87,8 @@ export async function getProfileLogins(): Promise<ProfileLoginsResult> {
     string,
     { last_sign_in_at?: string | null }
   >();
-  let page = 1;
-  while (page <= 10) {
-    const { data, error } = await admin.auth.admin.listUsers({
-      page,
-      perPage: 200,
-    });
-    if (error) throw error;
-    for (const user of data.users) {
-      authUsers.set(user.id, { last_sign_in_at: user.last_sign_in_at });
-    }
-    if (data.users.length < 200) break;
-    page += 1;
+  for (const user of await listAuthUsers(admin)) {
+    authUsers.set(user.id, { last_sign_in_at: user.last_sign_in_at });
   }
 
   const eventsByWorker = new Map<string, ProfileLogin[]>();

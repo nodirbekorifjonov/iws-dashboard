@@ -3,31 +3,48 @@ import {
   Advance,
   Attendance,
   attendanceHasExtraWork,
+  DEFAULT_PAY_CONTEXT,
   hourlyRateForAttendance,
+  isFemale12hWorker,
   isMaleWorker,
-  MALE_EXTRA_WORK_PAY,
   maleDailyRate,
   maleDayPay,
   maleStavkaFromStored,
+  PayContext,
   PayrollRow,
   roundMoney,
   Worker,
 } from '@/types/database';
 import { toNumber } from '@/lib/utils';
 
+function matchesStandard(value: number, standards: number[]) {
+  return standards.some((standard) => Math.abs(standard - value) < 1);
+}
+
 export function calculatePayroll(
   workers: Worker[],
   attendance: Attendance[],
   advances: Advance[],
-  month: string
+  month: string,
+  context: PayContext = DEFAULT_PAY_CONTEXT
 ): PayrollRow[] {
   const monthPrefix = month.slice(0, 7);
+  const { rates } = context;
 
   return workers.map((worker) => {
     const male = isMaleWorker(worker);
+    const storedMale = maleDailyRate(toNumber(worker.hourly_rate));
+    const storedHourly = toNumber(worker.hourly_rate);
     const hourlyRate = male
-      ? maleDailyRate(toNumber(worker.hourly_rate))
-      : toNumber(worker.hourly_rate);
+      ? matchesStandard(storedMale, context.standardMaleDaily)
+        ? rates.maleDailyPay
+        : storedMale
+      : isFemale12hWorker(worker)
+        ? storedHourly
+        : matchesStandard(storedHourly, context.standardFemale8h)
+          ? rates.female8hHourly
+          : storedHourly;
+    const ratedWorker = { ...worker, hourly_rate: hourlyRate };
     const workerAttendance = attendance.filter(
       (a) => a.worker_id === worker.id && a.date.startsWith(monthPrefix)
     );
@@ -48,7 +65,7 @@ export function calculatePayroll(
     const extraWorkPay = male
       ? roundMoney(
           paidRecords.filter((record) => attendanceHasExtraWork(record.notes)).length *
-            MALE_EXTRA_WORK_PAY
+            rates.maleExtraWorkPay
         )
       : 0;
 
@@ -64,13 +81,15 @@ export function calculatePayroll(
             maleDayPay(
               hourlyRate,
               maleStavkaFromStored(toNumber(record.hours_worked)),
-              attendanceHasExtraWork(record.notes)
+              attendanceHasExtraWork(record.notes),
+              rates.maleExtraWorkPay
             )
           );
         }
         return (
           sum +
-          toNumber(record.hours_worked) * hourlyRateForAttendance(worker, record.shift)
+          toNumber(record.hours_worked) *
+            hourlyRateForAttendance(ratedWorker, record.shift, rates)
         );
       }, 0)
     );
@@ -82,7 +101,7 @@ export function calculatePayroll(
     const remainingAmount = calculatedSalary - advanceAmount;
 
     return {
-      worker: { ...worker, hourly_rate: hourlyRate },
+      worker: ratedWorker,
       totalHours,
       totalStavka,
       extraWorkPay,
@@ -175,6 +194,21 @@ export function todayInTashkent(now = new Date()): string {
     month: '2-digit',
     day: '2-digit',
   }).format(now);
+}
+
+export function currentMonthInTashkent(now = new Date()): string {
+  return todayInTashkent(now).slice(0, 7);
+}
+
+export function hourInTashkent(value: string | Date): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: TASHKENT_TIME_ZONE,
+    hour: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(value));
+  const hour = Number(parts.find((item) => item.type === 'hour')?.value);
+  if (!Number.isFinite(hour)) return 0;
+  return hour === 24 ? 0 : hour;
 }
 
 export function isFutureDate(dateStr: string): boolean {

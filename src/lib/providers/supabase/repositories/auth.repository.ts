@@ -1,4 +1,4 @@
-import { effectiveRole } from '@/lib/auth/creator';
+import { resolveEffectiveRole } from '@/lib/auth/creator';
 import { AuthRepository } from '@/lib/repositories/auth.repository';
 import { AuthResult, SessionUser } from '@/lib/repositories/types';
 import { Profile } from '@/types/database';
@@ -47,7 +47,7 @@ export class SupabaseAuthRepository implements AuthRepository {
 
     if (!profile) return null;
 
-    const role = effectiveRole(profile.role, sessionUser.email);
+    const role = await resolveEffectiveRole(profile.role, sessionUser.email);
     return {
       ...(profile as Profile),
       role: role ?? profile.role,

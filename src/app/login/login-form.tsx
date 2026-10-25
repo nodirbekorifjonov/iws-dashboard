@@ -115,9 +115,7 @@ export function LoginForm({ initialError = '' }: { initialError?: string }) {
                 name="password"
                 label="Parol"
                 type={showPassword ? 'text' : 'password'}
-                placeholder={
-                  mode === 'worker' ? 'IWS-0001AkbarovaDilbar' : '••••••••'
-                }
+                placeholder={mode === 'worker' ? 'Administrator bergan parol' : '••••••••'}
                 required
                 autoComplete="current-password"
                 autoCapitalize="none"
@@ -140,9 +138,20 @@ export function LoginForm({ initialError = '' }: { initialError?: string }) {
               />
               {mode === 'worker' ? (
                 <p className="text-xs text-slate-500">
-                  Parol = kod + ism, bo‘sh joysiz. Masalan:{' '}
-                  <span className="break-all font-mono">IWS-0001AkbarovaDilbar</span>
+                  Parolni administrator beradi. Kod va parolni birga kiriting.
                 </p>
+              ) : null}
+              {mode === 'staff' && state.mfaRequired ? (
+                <Input
+                  id="otp"
+                  name="otp"
+                  label="Tasdiqlash kodi"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="123456"
+                  required
+                />
               ) : null}
 
               {error ? (

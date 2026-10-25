@@ -17,7 +17,7 @@ export function auditContext(
       monthLabel,
     };
   }
-  if (action?.startsWith('payroll')) {
+  if (action?.startsWith('payroll') || action?.startsWith('pay.')) {
     return {
       section: 'Hisoblash',
       href: month ? `/payroll?month=${month}` : '/payroll',
@@ -27,7 +27,11 @@ export function auditContext(
   if (action?.startsWith('location')) {
     return { section: 'Ish joylari', href: '/locations', monthLabel };
   }
-  if (action?.startsWith('staff')) {
+  if (
+    action?.startsWith('staff') ||
+    action?.startsWith('creator') ||
+    action?.startsWith('month')
+  ) {
     return { section: 'Nazorat', href: '/control', monthLabel };
   }
   if (action?.startsWith('worker')) {

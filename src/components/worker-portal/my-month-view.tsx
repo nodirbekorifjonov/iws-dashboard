@@ -11,7 +11,8 @@ import {
   formatStavka,
   isFemale12hWorker,
   isMaleWorker,
-  MALE_EXTRA_WORK_PAY,
+  DEFAULT_PAY_RATES,
+  PayRates,
   maleStavkaFromStored,
 } from '@/types/database';
 import { formatCurrency } from '@/lib/utils';
@@ -32,6 +33,7 @@ interface MyMonthViewProps {
   worker: Worker;
   attendance: Attendance[];
   payroll: PayrollRow;
+  rates?: PayRates;
 }
 
 function firstWeekdayOffset(month: string): number {
@@ -40,7 +42,13 @@ function firstWeekdayOffset(month: string): number {
   return (weekday + 6) % 7;
 }
 
-export function MyMonthView({ month, worker, attendance, payroll }: MyMonthViewProps) {
+export function MyMonthView({
+  month,
+  worker,
+  attendance,
+  payroll,
+  rates = DEFAULT_PAY_RATES,
+}: MyMonthViewProps) {
   const router = useRouter();
   const dates = getMonthDates(month);
   const offset = firstWeekdayOffset(month);
@@ -153,6 +161,7 @@ export function MyMonthView({ month, worker, attendance, payroll }: MyMonthViewP
                   future={future}
                   showShift={isFemale12hWorker(worker)}
                   male={male}
+                  extraPay={rates.maleExtraWorkPay}
                 />
               );
             })}
@@ -195,12 +204,14 @@ function DayCell({
   future,
   showShift,
   male,
+  extraPay,
 }: {
   day: number;
   record: Attendance | undefined;
   future: boolean;
   showShift: boolean;
   male: boolean;
+  extraPay: number;
 }) {
   let classes =
     'min-h-16 min-w-0 overflow-hidden break-words rounded-lg border px-0.5 py-1.5 text-left sm:min-h-[4.5rem] sm:px-1';
@@ -225,7 +236,7 @@ function DayCell({
       ? `${formatStavka(maleStavkaFromStored(record.hours_worked))} stavka`
       : `${record.hours_worked} soat`;
     if (male && attendanceHasExtraWork(record.notes)) {
-      detail += ` · +${formatCurrency(MALE_EXTRA_WORK_PAY)}`;
+      detail += ` · +${formatCurrency(extraPay)}`;
     }
     if (showShift && record.shift) {
       detail += ` · ${ATTENDANCE_SHIFT_LABELS[record.shift]}`;

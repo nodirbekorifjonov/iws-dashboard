@@ -1,6 +1,8 @@
 import { MyMonthView } from '@/components/worker-portal/my-month-view';
 import { getMyMonth } from '@/lib/actions/my-month';
+import { getPayContext } from '@/lib/api/pay-rates';
 import { requirePageRole } from '@/lib/auth/require-role';
+import { currentMonthInTashkent } from '@/lib/utils/payroll';
 
 export default async function MyPage({
   searchParams,
@@ -9,10 +11,9 @@ export default async function MyPage({
 }) {
   await requirePageRole(['worker']);
   const params = await searchParams;
-  const now = new Date();
-  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const defaultMonth = currentMonthInTashkent();
   const month = params.month || defaultMonth;
-  const result = await getMyMonth(month);
+  const [result, payContext] = await Promise.all([getMyMonth(month), getPayContext(month)]);
 
   if (!result) {
     return (
@@ -31,6 +32,7 @@ export default async function MyPage({
       worker={result.worker}
       attendance={result.attendance}
       payroll={result.payroll}
+      rates={payContext.rates}
     />
   );
 }

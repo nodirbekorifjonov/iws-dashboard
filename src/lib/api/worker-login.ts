@@ -1,11 +1,19 @@
+import { randomBytes } from 'crypto';
 import { getWorkerById, getWorkers } from '@/lib/api/workers';
 import { createSupabaseAdminClient } from '@/lib/providers/supabase/admin';
 import {
   MIN_WORKER_PASSWORD_LENGTH,
-  workerDefaultPassword,
   workerLoginCodeToEmail,
 } from '@/lib/utils/worker-login';
 import { Worker } from '@/types/database';
+
+export function generateWorkerPassword() {
+  const password = randomBytes(9).toString('base64url');
+  if (password.length < MIN_WORKER_PASSWORD_LENGTH) {
+    throw new Error(`Parol kamida ${MIN_WORKER_PASSWORD_LENGTH} ta belgidan iborat bo‘lishi kerak`);
+  }
+  return password;
+}
 
 const LOGIN_MIGRATION_ERROR =
   "Baza yangilanmagan. Supabase SQL Editor'da 008_worker_portal.sql migratsiyasini ishga tushiring yoki: npm run migrate";
@@ -19,11 +27,7 @@ function passwordForWorker(worker: Pick<Worker, 'login_code' | 'full_name'>) {
   if (!worker.login_code) {
     throw new Error(LOGIN_MIGRATION_ERROR);
   }
-  const password = workerDefaultPassword(worker.login_code, worker.full_name);
-  if (password.length < MIN_WORKER_PASSWORD_LENGTH) {
-    throw new Error(`Parol kamida ${MIN_WORKER_PASSWORD_LENGTH} ta belgidan iborat bo‘lishi kerak`);
-  }
-  return password;
+  return generateWorkerPassword();
 }
 
 export async function createWorkerAuthLogin(workerId: string) {
@@ -123,17 +127,25 @@ export async function provisionMissingWorkerLogins() {
 
   let created = 0;
   const errors: string[] = [];
+  const passwords: { fullName: string; loginCode: string; password: string }[] = [];
 
   for (const worker of missing) {
     try {
-      await createWorkerAuthLogin(worker.id);
+      const result = await createWorkerAuthLogin(worker.id);
       created += 1;
+      if (result.loginCode) {
+        passwords.push({
+          fullName: worker.full_name,
+          loginCode: result.loginCode,
+          password: result.password,
+        });
+      }
     } catch (err) {
       errors.push(`${worker.full_name}: ${errorText(err)}`);
     }
   }
 
-  return { created, failed: errors.length, errors };
+  return { created, failed: errors.length, errors, passwords };
 }
 
 export async function deleteWorkerAuthUser(userId: string) {

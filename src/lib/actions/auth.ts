@@ -1,9 +1,11 @@
 'use server';
 
 import { getLoginBlockReason } from '@/lib/api/access';
+import { getEnabledMfaSecret } from '@/lib/api/governance';
+import { verifyTotp } from '@/lib/auth/totp';
 import { recordProfileLogin } from '@/lib/api/logins';
 import { getUsers as apiGetUsers } from '@/lib/api/users';
-import { getLoginErrorMessage, getLoginModeError } from '@/lib/auth/login-errors';
+import { getLoginErrorMessage } from '@/lib/auth/login-errors';
 import { homePathForRole, requireRole } from '@/lib/auth/require-role';
 import {
   getCurrentUser as authGetCurrentUser,
@@ -35,6 +37,7 @@ export type { ProfileWithLocation };
 
 export type LoginState = {
   error: string;
+  mfaRequired?: boolean;
 };
 
 export async function getCurrentUser(): Promise<Profile | null> {
@@ -85,6 +88,31 @@ export async function login(
   if (blocked) {
     await authSignOut();
     return { error: blocked };
+  }
+
+  if (profile.role === 'creator') {
+    let secret: string | null;
+    try {
+      secret = await getEnabledMfaSecret(profile.id);
+    } catch (err) {
+      await authSignOut();
+      return {
+        error:
+          err instanceof Error
+            ? err.message
+            : 'Ikki bosqichli tekshiruvni bajarib bo‘lmadi.',
+      };
+    }
+    if (secret) {
+      const otp = String(formData.get('otp') ?? '').trim();
+      if (!verifyTotp(secret, otp)) {
+        await authSignOut();
+        return {
+          error: otp ? 'Tasdiqlash kodi noto‘g‘ri.' : 'Ikki bosqichli tasdiqlash kerak.',
+          mfaRequired: true,
+        };
+      }
+    }
   }
 
   try {

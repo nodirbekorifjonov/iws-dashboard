@@ -13,15 +13,14 @@ import {
   WORKER_POSITIONS,
   WORKER_GENDER_LABELS,
   SHIFT_LENGTH_LABELS,
-  FEMALE_12H_DAY_PAY,
-  FEMALE_12H_NIGHT_PAY,
+  DEFAULT_PAY_RATES,
   FEMALE_12H_HOURS,
+  PayRates,
   defaultHourlyRate,
   female12hDayHourly,
   female12hNightHourly,
   isFemale12hWorker,
   isMaleWorker,
-  MALE_EXTRA_WORK_PAY,
   maleDailyRate,
   roundMoney,
 } from '@/types/database';
@@ -38,15 +37,18 @@ import {
   WorkerSearchFilter,
   useWorkerSearchFilter,
 } from '@/components/workers/worker-search-filter';
-import { workerDefaultPassword } from '@/lib/utils/worker-login';
 import { KeyRound, Pencil, Plus, Trash2, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 
 interface WorkersTableProps {
   initialWorkers: Worker[];
+  rates?: PayRates;
 }
 
-export function WorkersTable({ initialWorkers }: WorkersTableProps) {
+export function WorkersTable({
+  initialWorkers,
+  rates = DEFAULT_PAY_RATES,
+}: WorkersTableProps) {
   const [showModal, setShowModal] = useState(false);
   const [editingWorker, setEditingWorker] = useState<Worker | null>(null);
   const [loading, setLoading] = useState(false);
@@ -95,11 +97,11 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
 
   function applyRate(nextGender: WorkerGender | '', nextShift: ShiftLength | '') {
     if (nextGender === 'male') {
-      setHourlyRate(String(defaultHourlyRate('male')));
+      setHourlyRate(String(defaultHourlyRate('male', null, rates)));
       return;
     }
     if (nextGender === 'female' && nextShift) {
-      setHourlyRate(String(defaultHourlyRate('female', nextShift)));
+      setHourlyRate(String(defaultHourlyRate('female', nextShift, rates)));
     }
   }
 
@@ -145,12 +147,12 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Ishchini o\'chirishni tasdiqlaysizmi?')) return;
+    if (!confirm('Ishchini o‘chirishni tasdiqlaysizmi? 7 kun ichida Creator tiklashi mumkin.')) return;
 
     try {
       await deleteWorker(id);
-    } catch {
-      alert('O\'chirishda xatolik');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'O‘chirishda xatolik');
     }
   }
 
@@ -183,12 +185,16 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
         setFeedback({ title: 'Xatolik', message: result.error });
         return;
       }
-      const password =
-        result.password ||
-        workerDefaultPassword(worker.login_code || '', worker.full_name);
+      if (!result.password) {
+        setFeedback({
+          title: 'Xatolik',
+          message: 'Parol qaytarilmadi. Qayta yangilang.',
+        });
+        return;
+      }
       setFeedback({
         title: worker.user_id ? 'Parol yangilandi' : 'Kirish yaratildi',
-        message: `Kod: ${result.loginCode || worker.login_code}\nParol: ${password}\n\nParol = kod + ism, bo‘sh joysiz.`,
+        message: `Kod: ${result.loginCode || worker.login_code}\nParol: ${result.password}\n\nParolni hozir yozib oling. Keyin ko‘rsatilmaydi.`,
       });
     } catch (err) {
       setConfirmDialog(null);
@@ -214,9 +220,12 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
         result.failed && result.errors?.length
           ? `\n\nXatolik (${result.failed}):\n${result.errors.slice(0, 8).join('\n')}`
           : '';
+      const passwordNote = (result.passwords ?? [])
+        .map((item) => `${item.fullName}: ${item.loginCode} / ${item.password}`)
+        .join('\n');
       setFeedback({
         title: 'Kirish yaratildi',
-        message: `${result.created ?? 0} ta kirish yaratildi.${failedNote}`,
+        message: `${result.created ?? 0} ta kirish yaratildi.${passwordNote ? `\n\n${passwordNote}\n\nParolni hozir yozib oling. Keyin ko‘rsatilmaydi.` : ''}${failedNote}`,
       });
     } catch (err) {
       setConfirmDialog(null);
@@ -300,8 +309,6 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
           Ishchi kodlari uchun Supabase SQL Editor’da{' '}
           <code className="rounded bg-white/70 px-1">008_worker_portal.sql</code> ni
           ishga tushiring yoki <code className="rounded bg-white/70 px-1">npm run migrate</code>.
-          Parol = kod + ism, bo‘sh joysiz (masalan{' '}
-          <span className="break-all">IWS-0001AkbarovaDilbar</span>).
         </div>
       ) : null}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -367,7 +374,7 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
                       {worker.phone || 'Telefon yo‘q'}
                     </p>
                     <p className="mt-1 break-words text-sm text-slate-700">
-                      <WorkerRateText worker={worker} />
+                      <WorkerRateText worker={worker} rates={rates} />
                     </p>
                   </div>
                   <Badge variant={worker.is_active ? 'success' : 'neutral'}>
@@ -434,7 +441,7 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
                         {formatDate(worker.start_date)}
                       </td>
                       <td className="text-slate-600">
-                        <WorkerRateText worker={worker} />
+                        <WorkerRateText worker={worker} rates={rates} />
                       </td>
                       <td>
                         <Badge variant={worker.is_active ? 'success' : 'neutral'}>
@@ -467,7 +474,7 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
         <p className="text-sm text-slate-700">
           {confirmDialog?.kind === 'login'
             ? `${confirmDialog.worker.full_name} uchun ${loginActionLabel(confirmDialog.worker).toLowerCase()}?`
-            : `${missingLogins.length} ta ishchiga kirish yaratiladi. Parol = kod + ism, bo‘sh joysiz.`}
+            : `${missingLogins.length} ta ishchiga tasodifiy parol bilan kirish yaratiladi. Parollar bir marta ko‘rsatiladi.`}
         </p>
         <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
           <Button
@@ -584,8 +591,8 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
               />
               <p className="mt-1 text-xs text-slate-500">
                 {gender === 'male'
-                  ? `1 stavka = shu summa. Davomatda 0.5, 1, 1.5 yoki 2 stavka belgilanadi. Qo'shimcha ish kuniga ${formatCurrency(MALE_EXTRA_WORK_PAY)}.`
-                  : '8 soatlik: 15 000 so\'m/soat (8 soat = 120 000 so\'m). Qo\'shimcha soatlar shu stavkada.'}
+                  ? `1 stavka = shu summa. Davomatda 0.5, 1, 1.5 yoki 2 stavka belgilanadi. Qo'shimcha ish kuniga ${formatCurrency(rates.maleExtraWorkPay)}.`
+                  : `8 soatlik: ${formatCurrency(rates.female8hHourly)}/soat. Qo'shimcha soatlar shu stavkada.`}
               </p>
             </div>
           )}
@@ -594,18 +601,18 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
               <input
                 type="hidden"
                 name="hourly_rate"
-                value={String(defaultHourlyRate('female', 12))}
+                value={String(defaultHourlyRate('female', 12, rates))}
               />
               <p className="font-medium text-slate-900">12 soatlik soatbay stavkalar</p>
               <p className="mt-1">
-                Kunduzgi: {formatCurrency(FEMALE_12H_DAY_PAY)} / {FEMALE_12H_HOURS} soat
+                Kunduzgi: {formatCurrency(rates.female12hDayPay)} / {FEMALE_12H_HOURS} soat
                 {' '}
-                ({formatCurrency(roundMoney(female12hDayHourly()))}/soat)
+                ({formatCurrency(roundMoney(female12hDayHourly(rates)))}/soat)
               </p>
               <p>
-                Kechki: {formatCurrency(FEMALE_12H_NIGHT_PAY)} / {FEMALE_12H_HOURS} soat
+                Kechki: {formatCurrency(rates.female12hNightPay)} / {FEMALE_12H_HOURS} soat
                 {' '}
-                ({formatCurrency(roundMoney(female12hNightHourly()))}/soat)
+                ({formatCurrency(roundMoney(female12hNightHourly(rates)))}/soat)
               </p>
               <p className="mt-1 text-xs text-slate-500">
                 Stavka davomatdagi smenaga qarab avtomatik qo&apos;llaniladi.
@@ -643,15 +650,15 @@ export function WorkersTable({ initialWorkers }: WorkersTableProps) {
   );
 }
 
-function WorkerRateText({ worker }: { worker: Worker }) {
+function WorkerRateText({ worker, rates }: { worker: Worker; rates: PayRates }) {
   if (isFemale12hWorker(worker)) {
     return (
       <span>
         <span className="block">
-          Kunduzgi: {formatCurrency(roundMoney(female12hDayHourly()))}/soat
+          Kunduzgi: {formatCurrency(roundMoney(female12hDayHourly(rates)))}/soat
         </span>
         <span className="block">
-          Kechki: {formatCurrency(roundMoney(female12hNightHourly()))}/soat
+          Kechki: {formatCurrency(roundMoney(female12hNightHourly(rates)))}/soat
         </span>
       </span>
     );

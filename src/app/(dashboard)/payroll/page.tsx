@@ -1,19 +1,26 @@
 import { PayrollCalculator } from '@/components/payroll/payroll-calculator';
+import { MonthLockBar } from '@/components/creator/month-lock-bar';
 import { calculatePayroll } from '@/lib/actions/payroll';
+import { isMonthLocked } from '@/lib/api/governance';
+import { getPayContext } from '@/lib/api/pay-rates';
 import { PageHeader } from '@/components/layout/page-header';
 import { ADMIN_ROLES, requirePageRole } from '@/lib/auth/require-role';
+import { currentMonthInTashkent } from '@/lib/utils/payroll';
 
 export default async function PayrollPage({
   searchParams,
 }: {
   searchParams: Promise<{ month?: string; calculated?: string }>;
 }) {
-  await requirePageRole(ADMIN_ROLES);
+  const profile = await requirePageRole(ADMIN_ROLES);
   const params = await searchParams;
-  const now = new Date();
-  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const defaultMonth = currentMonthInTashkent();
   const month = params.month || defaultMonth;
-  const result = await calculatePayroll(month);
+  const [result, locked, payContext] = await Promise.all([
+    calculatePayroll(month),
+    isMonthLocked(month),
+    getPayContext(month),
+  ]);
 
   return (
     <div>
@@ -21,7 +28,14 @@ export default async function PayrollPage({
         title="Hisoblash"
         description="Oylik maosh hisob-kitobi — davomat va avanslar asosida"
       />
-      <PayrollCalculator key={month} month={month} initialRows={result.rows} />
+      <MonthLockBar month={month} locked={locked} canManage={profile.role === 'creator'} />
+      <PayrollCalculator
+        key={month}
+        month={month}
+        initialRows={result.rows}
+        rates={payContext.rates}
+        advancesLocked={locked && profile.role !== 'creator'}
+      />
     </div>
   );
 }

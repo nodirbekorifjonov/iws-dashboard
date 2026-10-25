@@ -37,5 +37,8 @@ export function getLoginModeError(mode: string): string {
   if (mode === 'staff') {
     return 'Ishchi hisobi uchun Ishchi bo‘limini tanlang.';
   }
+  if (mode === 'blocked') {
+    return 'Bu hisob yopilgan. Creator ochmaguncha kirib bo‘lmaydi.';
+  }
   return '';
 }

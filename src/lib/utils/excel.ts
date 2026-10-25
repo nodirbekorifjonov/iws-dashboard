@@ -8,8 +8,9 @@ import {
   formatStavka,
   isFemale12hWorker,
   isMaleWorker,
-  MALE_EXTRA_WORK_PAY,
+  DEFAULT_PAY_RATES,
   maleStavkaFromStored,
+  PayRates,
   roundMoney,
 } from '@/types/database';
 import { getAbsenceReason } from '@/lib/utils/payroll';
@@ -44,12 +45,12 @@ function formatAttendanceCell(
   return getAbsenceReason(cell.status, cell.notes || null);
 }
 
-function formatPayrollRate(row: PayrollRow): string | number {
+function formatPayrollRate(row: PayrollRow, rates: PayRates): string | number {
   if (isMaleWorker(row.worker)) {
     return row.worker.hourly_rate;
   }
   if (isFemale12hWorker(row.worker)) {
-    return `${roundMoney(female12hDayHourly())} / ${roundMoney(female12hNightHourly())}`;
+    return `${roundMoney(female12hDayHourly(rates))} / ${roundMoney(female12hNightHourly(rates))}`;
   }
   return row.worker.hourly_rate;
 }
@@ -58,7 +59,8 @@ export async function exportAttendanceToExcel(
   workers: Worker[],
   cells: Record<string, AttendanceCellData>,
   month: string,
-  dates: string[]
+  dates: string[],
+  rates: PayRates = DEFAULT_PAY_RATES
 ) {
   const XLSX = await import('xlsx');
 
@@ -80,7 +82,7 @@ export async function exportAttendanceToExcel(
       if (cell && (cell.status === 'present' || cell.status === 'late')) {
         if (male) {
           totalStavka += maleStavkaFromStored(cell.hoursWorked || 0);
-          if (attendanceHasExtraWork(cell.notes)) extraPay += MALE_EXTRA_WORK_PAY;
+          if (attendanceHasExtraWork(cell.notes)) extraPay += rates.maleExtraWorkPay;
         } else {
           totalHours += cell.hoursWorked || 0;
         }
@@ -113,7 +115,11 @@ export async function exportAttendanceToExcel(
   XLSX.writeFile(workbook, `davomat-${month.slice(0, 7)}.xlsx`);
 }
 
-export async function exportPayrollToExcel(rows: PayrollRow[], month: string) {
+export async function exportPayrollToExcel(
+  rows: PayrollRow[],
+  month: string,
+  rates: PayRates = DEFAULT_PAY_RATES
+) {
   const XLSX = await import('xlsx');
 
   const header = [
@@ -131,7 +137,7 @@ export async function exportPayrollToExcel(rows: PayrollRow[], month: string) {
   const dataRows = rows.map((row) => [
     row.worker.full_name,
     row.worker.position || '',
-    formatPayrollRate(row),
+    formatPayrollRate(row, rates),
     isMaleWorker(row.worker) ? '' : row.totalHours,
     isMaleWorker(row.worker) ? row.totalStavka : '',
     isMaleWorker(row.worker) ? row.extraWorkPay : '',
@@ -180,4 +186,17 @@ export async function exportPayrollToExcel(rows: PayrollRow[], month: string) {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Hisoblash');
   XLSX.writeFile(workbook, `hisoblash-${month.slice(0, 7)}.xlsx`);
+}
+
+export async function exportAuditToExcel(
+  rows: { createdAt: string; actor: string; action: string; summary: string }[]
+) {
+  const XLSX = await import('xlsx');
+  const header = ['Vaqt', 'Kim', 'Amal', 'Tafsilot'];
+  const data = rows.map((row) => [row.createdAt, row.actor, row.action, row.summary]);
+  const worksheet = XLSX.utils.aoa_to_sheet([header, ...data]);
+  worksheet['!cols'] = [{ wch: 22 }, { wch: 24 }, { wch: 24 }, { wch: 72 }];
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Jurnal');
+  XLSX.writeFile(workbook, 'nazorat-jurnal.xlsx');
 }

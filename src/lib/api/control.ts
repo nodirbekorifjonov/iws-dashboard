@@ -3,10 +3,14 @@ import { getAuditEvents } from '@/lib/api/audit';
 import { getDashboardStats } from '@/lib/api/attendance';
 import { getProfileLogins } from '@/lib/api/logins';
 import { calculatePayroll } from '@/lib/api/payroll';
-import { isCreatorEmail, visibleRoleLabel } from '@/lib/auth/creator';
+import { isCreatorEmailAsync, visibleRoleLabel } from '@/lib/auth/creator';
+import { revokeUserSessions } from '@/lib/api/governance';
 import { createSupabaseAdminClient } from '@/lib/providers/supabase/admin';
 import { formatCurrency } from '@/lib/utils';
 import { auditContext } from '@/lib/utils/audit-context';
+import { getPayContext } from '@/lib/api/pay-rates';
+import { listAuthUsers } from '@/lib/api/auth-users';
+import { currentMonthInTashkent, hourInTashkent } from '@/lib/utils/payroll';
 import {
   AuditEvent,
   ControlAlert,
@@ -15,10 +19,9 @@ import {
 } from '@/types/database';
 
 const ONLINE_MS = 10 * 60 * 1000;
-const LARGE_ADVANCE = 500_000;
 
 function isNightHour(date: string) {
-  const hour = new Date(date).getHours();
+  const hour = hourInTashkent(date);
   return hour >= 22 || hour < 6;
 }
 
@@ -103,8 +106,7 @@ const MONTH_NAMES = [
 const ROLE_COLORS = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
 
 export async function getControlCenter(): Promise<ControlCenterData> {
-  const now = new Date();
-  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const month = currentMonthInTashkent();
   const admin = createSupabaseAdminClient();
 
   const [dash, payroll, logins, audit, pings] = await Promise.all([
@@ -135,7 +137,8 @@ export async function getControlCenter(): Promise<ControlCenterData> {
   {
     const withFlags = await admin
       .from('workers')
-      .select('id, full_name, login_code, user_id, is_active, login_enabled, created_at')
+      .select('id, full_name, login_code, user_id, is_active, login_enabled, created_at, deleted_at')
+      .is('deleted_at', null)
       .order('full_name');
     if (withFlags.error) {
       const fallback = await admin
@@ -168,18 +171,17 @@ export async function getControlCenter(): Promise<ControlCenterData> {
   }
 
   const authEmails = new Map<string, { email?: string; last_sign_in_at?: string | null }>();
-  let page = 1;
-  while (page <= 10) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
-    if (error) break;
-    for (const user of data.users) {
-      authEmails.set(user.id, {
-        email: user.email,
-        last_sign_in_at: user.last_sign_in_at,
-      });
-    }
-    if (data.users.length < 200) break;
-    page += 1;
+  for (const user of await listAuthUsers(admin)) {
+    authEmails.set(user.id, {
+      email: user.email,
+      last_sign_in_at: user.last_sign_in_at,
+    });
+  }
+
+  const creatorEmails = new Set<string>();
+  for (const profile of profiles) {
+    const email = authEmails.get(profile.id)?.email;
+    if (email && (await isCreatorEmailAsync(email))) creatorEmails.add(email.toLowerCase());
   }
 
   const onlineIds = new Set(
@@ -214,7 +216,9 @@ export async function getControlCenter(): Promise<ControlCenterData> {
         id: profile.id,
         fullName: profile.full_name,
         role: visibleRoleLabel(
-          isCreatorEmail(auth?.email) ? 'creator' : profile.role
+          auth?.email && creatorEmails.has(auth.email.toLowerCase())
+            ? 'creator'
+            : profile.role
         ),
         loginCode: null,
         lastLoggedInAt,
@@ -235,7 +239,14 @@ export async function getControlCenter(): Promise<ControlCenterData> {
     return Boolean(worker?.user_id) && !row.hasLoggedIn;
   });
 
-  const alerts = buildAlerts(audit, logins.recent, neverLoggedIn, workers);
+  const payContext = await getPayContext(month);
+  const alerts = buildAlerts(
+    audit,
+    logins.recent,
+    neverLoggedIn,
+    workers,
+    payContext.rates.largeAdvanceLimit
+  );
 
   const totalHours = payroll.rows.reduce((sum, row) => sum + row.totalHours, 0);
   const totalSalary = payroll.rows.reduce((sum, row) => sum + row.calculatedSalary, 0);
@@ -253,7 +264,7 @@ export async function getControlCenter(): Promise<ControlCenterData> {
 
   return {
     month,
-    monthLabel: `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`,
+    monthLabel: `${MONTH_NAMES[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`,
     stats: {
       totalWorkers: dash.totalWorkers,
       todayPresent: dash.todayPresent,
@@ -328,10 +339,10 @@ export async function getControlCenter(): Promise<ControlCenterData> {
           fullName: profile.full_name,
           role: profile.role,
           roleLabel: visibleRoleLabel(
-            isCreatorEmail(email) ? 'creator' : profile.role
+            email && creatorEmails.has(email.toLowerCase()) ? 'creator' : profile.role
           ),
           accessDisabled: profile.access_disabled === true,
-          isCreator: isCreatorEmail(email),
+          isCreator: Boolean(email && creatorEmails.has(email.toLowerCase())),
         };
       }),
   };
@@ -339,9 +350,10 @@ export async function getControlCenter(): Promise<ControlCenterData> {
 
 function buildAlerts(
   audit: AuditEvent[],
-  recentLogins: { role: string; full_name: string; logged_in_at: string }[],
+  recentLogins: { role: string; full_name: string; logged_in_at: string; user_id?: string | null }[],
   neverLoggedIn: ControlLoginRow[],
-  workers: Array<{ id: string; created_at?: string; user_id?: string | null }>
+  workers: Array<{ id: string; created_at?: string; user_id?: string | null }>,
+  largeAdvance: number
 ): ControlAlert[] {
   const alerts: ControlAlert[] = [];
   const dayAgo = Date.now() - 86_400_000;
@@ -366,13 +378,20 @@ function buildAlerts(
       severity: 'warning',
       section: context.section,
       href: context.href,
+      action: list[0].actor_id
+        ? {
+            kind: 'disable-staff',
+            targetId: list[0].actor_id,
+            label: 'Hisobni yopish',
+          }
+        : undefined,
     });
   }
 
   for (const event of audit) {
     if (event.action === 'payroll.advance' && isNightHour(event.created_at)) {
       const amount = Number(event.metadata?.amount ?? 0);
-      if (amount >= LARGE_ADVANCE) {
+      if (amount >= largeAdvance) {
         const context = auditContext(event.action, event.metadata, event.entity_name);
         const oldAmount = Number(event.metadata?.oldAmount ?? 0);
         const workerName = event.entity_name || 'ishchi';
@@ -384,6 +403,13 @@ function buildAlerts(
           severity: 'danger',
           section: context.section,
           href: context.href,
+          action: event.actor_id
+            ? {
+                kind: 'disable-staff',
+                targetId: event.actor_id,
+                label: 'Hisobni yopish',
+              }
+            : undefined,
         });
       }
     }
@@ -399,6 +425,14 @@ function buildAlerts(
           severity: 'warning',
           section: context.section,
           href: context.href,
+          action:
+            typeof event.metadata?.month === 'string'
+              ? {
+                  kind: 'lock-month',
+                  targetId: event.metadata.month,
+                  label: 'Oyni yopish',
+                }
+              : undefined,
         });
       }
     }
@@ -412,6 +446,13 @@ function buildAlerts(
         severity: 'danger',
         section: context.section,
         href: context.href,
+        action: event.entity_id
+          ? {
+              kind: 'restore-worker',
+              targetId: event.entity_id,
+              label: 'Tiklash',
+            }
+          : undefined,
       });
     }
   }
@@ -428,6 +469,13 @@ function buildAlerts(
       severity: 'warning',
       section: 'Kirish',
       href: '/control',
+      action: event.user_id
+        ? {
+            kind: 'disable-staff',
+            targetId: event.user_id,
+            label: 'Hisobni yopish',
+          }
+        : undefined,
     });
   }
 
@@ -464,12 +512,16 @@ export async function setWorkerLoginEnabled(workerId: string, enabled: boolean) 
     }
     throw error;
   }
+  if (!enabled) {
+    const { data } = await admin.from('workers').select('user_id').eq('id', workerId).maybeSingle();
+    if (data?.user_id) await revokeUserSessions(data.user_id);
+  }
 }
 
 export async function setStaffAccessDisabled(userId: string, disabled: boolean) {
   const admin = createSupabaseAdminClient();
   const { data: user } = await admin.auth.admin.getUserById(userId);
-  if (isCreatorEmail(user.user?.email)) {
+  if (await isCreatorEmailAsync(user.user?.email)) {
     throw new Error('Bu hisobni yopib bo‘lmaydi.');
   }
   const { error } = await admin
@@ -484,4 +536,5 @@ export async function setStaffAccessDisabled(userId: string, disabled: boolean) 
     }
     throw error;
   }
+  if (disabled) await revokeUserSessions(userId);
 }

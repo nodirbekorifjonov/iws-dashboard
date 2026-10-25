@@ -1,4 +1,5 @@
 import { getAttendanceHistory } from '@/lib/api/attendance';
+import { getPayContext } from '@/lib/api/pay-rates';
 import { getWorkerByUserId } from '@/lib/api/workers';
 import { getPayrollRepository } from '@/lib/providers';
 import { MyMonthResult } from '@/lib/repositories/types';
@@ -14,7 +15,14 @@ export async function getMyMonth(userId: string, month: string): Promise<MyMonth
     worker.id,
     monthPrefix
   );
-  const [payroll] = calculatePayroll([worker], attendance, advances, monthPrefix);
+  const payContext = await getPayContext(monthPrefix);
+  const [payroll] = calculatePayroll(
+    [worker],
+    attendance,
+    advances,
+    monthPrefix,
+    payContext
+  );
 
   return {
     month: monthPrefix,

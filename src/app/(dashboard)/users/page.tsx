@@ -1,6 +1,9 @@
 import { getUsers } from '@/lib/actions/auth';
+import { getStaffDirectory } from '@/lib/actions/governance';
+import { getLocations } from '@/lib/actions/locations';
 import { visibleRoleLabel } from '@/lib/auth/creator';
 import { requirePageRole } from '@/lib/auth/require-role';
+import { UsersManager } from '@/components/users/users-manager';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/layout/page-header';
@@ -14,7 +17,25 @@ function roleVariant(role: string) {
 }
 
 export default async function UsersPage() {
-  await requirePageRole(['superadmin', 'creator']);
+  const profile = await requirePageRole(['superadmin', 'creator']);
+
+  if (profile.role === 'creator') {
+    const [accounts, locations] = await Promise.all([getStaffDirectory(), getLocations()]);
+    return (
+      <div>
+        <PageHeader
+          title="Foydalanuvchilar"
+          description="Xodim hisobini yarating, rol bering va brigadirni blokka biriktiring"
+        />
+        <UsersManager
+          accounts={accounts}
+          locations={locations
+            .filter((location) => location.is_active)
+            .map((location) => ({ id: location.id, name: location.name }))}
+        />
+      </div>
+    );
+  }
 
   const users = await getUsers();
 
@@ -22,23 +43,8 @@ export default async function UsersPage() {
     <div>
       <PageHeader
         title="Foydalanuvchilar"
-        description="Tizim foydalanuvchilarini boshqarish (faqat superadmin)"
+        description="Tizim foydalanuvchilari. Hisob yaratish va rol o‘zgartirish Creator nazoratida"
       />
-
-      <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50 p-4">
-        <p className="text-sm break-words text-indigo-900">
-          Yangi foydalanuvchi yaratish uchun Supabase Dashboard → Authentication → Users
-          bo&apos;limidan foydalanuvchi qo&apos;shing. Rol avtomatik{' '}
-          <code className="rounded bg-white/70 px-1 break-all">brigadier</code> bo&apos;ladi.
-          Superadmin/admin qilish uchun SQL:{' '}
-          <code className="rounded bg-white/70 px-1 break-all">
-            UPDATE profiles SET role = &apos;superadmin&apos; WHERE id = &apos;...&apos;
-          </code>
-          . Metadata da faqat <code className="rounded bg-white/70 px-1 break-all">full_name</code>{' '}
-          ishlatiladi. Ishchi kirishi Ishchilar sahifasidan yaratiladi; parol = kod + ism
-          (bo‘sh joysiz).
-        </p>
-      </div>
 
       <div className="space-y-3 md:hidden">
         {users.length === 0 ? (

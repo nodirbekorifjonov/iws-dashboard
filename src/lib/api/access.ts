@@ -1,23 +1,14 @@
-import { isCreatorEmail } from '@/lib/auth/creator';
+import { isCreatorEmailAsync } from '@/lib/auth/creator';
 import { createSupabaseAdminClient } from '@/lib/providers/supabase/admin';
 import { Profile } from '@/types/database';
 
-function isMissingColumn(error: { message?: string; code?: string } | null) {
-  if (!error) return false;
-  const text = `${error.code ?? ''} ${error.message ?? ''}`.toLowerCase();
-  return (
-    error.code === 'PGRST204' ||
-    text.includes('login_enabled') ||
-    text.includes('access_disabled') ||
-    text.includes('schema cache')
-  );
-}
+const CHECK_FAILED = 'Hisob holatini tekshirib bo‘lmadi. Qayta urinib ko‘ring.';
 
 export async function getLoginBlockReason(
   profile: Profile,
   email?: string | null
 ): Promise<string | null> {
-  if (isCreatorEmail(email)) return null;
+  if (await isCreatorEmailAsync(email)) return null;
 
   const admin = createSupabaseAdminClient();
 
@@ -27,8 +18,9 @@ export async function getLoginBlockReason(
       .select('login_enabled')
       .eq('user_id', profile.id)
       .maybeSingle();
-    if (error && !isMissingColumn(error)) {
+    if (error) {
       console.error(error.message);
+      return CHECK_FAILED;
     }
     if (data && data.login_enabled === false) {
       return 'Bu ishchi portali o‘chirilgan. Adminga murojaat qiling.';
@@ -41,8 +33,9 @@ export async function getLoginBlockReason(
     .select('access_disabled')
     .eq('id', profile.id)
     .maybeSingle();
-  if (error && !isMissingColumn(error)) {
+  if (error) {
     console.error(error.message);
+    return CHECK_FAILED;
   }
   if (data && data.access_disabled === true) {
     return 'Bu hisob vaqtincha yopilgan.';

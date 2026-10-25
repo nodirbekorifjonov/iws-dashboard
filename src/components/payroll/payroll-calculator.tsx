@@ -3,6 +3,8 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
+  DEFAULT_PAY_RATES,
+  PayRates,
   PayrollRow,
   Worker,
   female12hDayHourly,
@@ -27,9 +29,16 @@ import { useMemo, useState } from 'react';
 interface PayrollCalculatorProps {
   month: string;
   initialRows: PayrollRow[] | null;
+  rates?: PayRates;
+  advancesLocked?: boolean;
 }
 
-export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps) {
+export function PayrollCalculator({
+  month,
+  initialRows,
+  rates = DEFAULT_PAY_RATES,
+  advancesLocked = false,
+}: PayrollCalculatorProps) {
   const router = useRouter();
   const [rows, setRows] = useState<PayrollRow[] | null>(initialRows);
   const [calculating, setCalculating] = useState(false);
@@ -93,7 +102,7 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
 
     setExporting(true);
     try {
-      await exportPayrollToExcel(rows, month);
+      await exportPayrollToExcel(rows, month, rates);
     } catch {
       alert('Excel faylni yuklab olishda xatolik');
     } finally {
@@ -109,7 +118,11 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
     }
     setSavingAdvance(workerId);
     try {
-      await updateAdvance(workerId, month, amount);
+      const result = await updateAdvance(workerId, month, amount);
+      if (result.pending) {
+        alert('Bu summa Creator tasdig‘ini kutmoqda. Avans hali o‘zgarmadi.');
+        return;
+      }
       if (rows) {
         setRows(
           rows.map((r) =>
@@ -123,8 +136,8 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
           )
         );
       }
-    } catch {
-      alert('Avans saqlashda xatolik');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Avans saqlashda xatolik');
     } finally {
       setSavingAdvance(null);
     }
@@ -213,7 +226,7 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
                       <div className="flex items-start justify-between gap-3">
                         <dt className="text-slate-500">Stavka</dt>
                         <dd className="min-w-0 text-right text-slate-700">
-                          <WorkerRate worker={row.worker} />
+                          <WorkerRate worker={row.worker} rates={rates} />
                         </dd>
                       </div>
                       <div className="flex items-start justify-between gap-3">
@@ -242,13 +255,14 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
                               [row.worker.id]: e.target.value,
                             }))
                           }
-                          className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-right text-sm"
+                          disabled={advancesLocked}
+                          className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-right text-sm disabled:bg-slate-50"
                         />
                         <Button
                           variant="secondary"
                           size="sm"
                           onClick={() => handleSaveAdvance(row.worker.id)}
-                          disabled={savingAdvance === row.worker.id}
+                          disabled={advancesLocked || savingAdvance === row.worker.id}
                         >
                           <Save className="h-4 w-4" />
                         </Button>
@@ -332,7 +346,7 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
                             )}
                           </td>
                           <td className="text-slate-600">
-                            <WorkerRate worker={row.worker} />
+                            <WorkerRate worker={row.worker} rates={rates} />
                           </td>
                           <td className="text-right font-medium text-slate-900">
                             <WorkerWorked row={row} />
@@ -352,13 +366,14 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
                                     [row.worker.id]: e.target.value,
                                   }))
                                 }
-                                className="w-28 rounded-lg border border-slate-200 px-2 py-1 text-right text-sm"
+                                disabled={advancesLocked}
+                                className="w-28 rounded-lg border border-slate-200 px-2 py-1 text-right text-sm disabled:bg-slate-50"
                               />
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleSaveAdvance(row.worker.id)}
-                                disabled={savingAdvance === row.worker.id}
+                                disabled={advancesLocked || savingAdvance === row.worker.id}
                               >
                                 <Save className="h-4 w-4" />
                               </Button>
@@ -420,12 +435,12 @@ export function PayrollCalculator({ month, initialRows }: PayrollCalculatorProps
   );
 }
 
-function WorkerRate({ worker }: { worker: Worker }) {
+function WorkerRate({ worker, rates }: { worker: Worker; rates: PayRates }) {
   if (isFemale12hWorker(worker)) {
     return (
       <div>
-        <div>Kunduzgi: {formatCurrency(roundMoney(female12hDayHourly()))}/soat</div>
-        <div>Kechki: {formatCurrency(roundMoney(female12hNightHourly()))}/soat</div>
+        <div>Kunduzgi: {formatCurrency(roundMoney(female12hDayHourly(rates)))}/soat</div>
+        <div>Kechki: {formatCurrency(roundMoney(female12hNightHourly(rates)))}/soat</div>
       </div>
     );
   }

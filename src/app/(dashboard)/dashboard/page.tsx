@@ -70,6 +70,12 @@ export default async function DashboardPage() {
         description={`Bugungi holat — ${formatTashkentTodayLabel()}`}
       />
 
+      {profile.role === 'brigadier' && !profile.assigned_location_id ? (
+        <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Sizga blok biriktirilmagan. Creator Foydalanuvchilar sahifasidan blok biriktiradi.
+        </p>
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (
           <StatCard
